@@ -771,14 +771,20 @@ export async function submitApplication(user: AuthUser, id: string, meta: Meta) 
       ...meta,
     });
 
+    // APPLICATION_SUBMITTED, not APPLICATION_FORWARDED. Forwarding is a
+    // desk-to-desk move made by an officer; this is the applicant handing the
+    // file in, and an applicant who is told their own filing was "forwarded"
+    // reasonably asks who forwarded it and to whom. The audience is identical,
+    // so the change costs nothing and the wording stops being wrong.
     await emit(tx, {
-      eventCode: EVENTS.APPLICATION_FORWARDED,
+      eventCode: EVENTS.APPLICATION_SUBMITTED,
       applicationId: app.id,
       payload: {
         applicationNumber: app.applicationNumber,
         status: 'SUBMITTED',
         ltpUserId: app.ltpUserId,
         zoneId: app.zoneId,
+        submittedAt: submittedAt.toISOString(),
       },
     });
 

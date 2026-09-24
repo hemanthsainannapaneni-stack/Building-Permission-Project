@@ -9,8 +9,8 @@ import {
   Ban,
   CircleCheck,
   Clock,
+  FileText,
   FileUp,
-  MessageSquare,
   Paperclip,
   Send,
   X,
@@ -22,24 +22,27 @@ import { Textarea } from '@/components/ui/textarea';
 import { Field } from '@/components/ui/field';
 import { StatusBadge } from '@/components/common/status-badge';
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from '@/components/ui/toast';
 import { api, ApiCallError } from '@/features/applications/api';
 import { stageName } from '@/lib/workflow';
 import { formatMoney } from '@/lib/fees';
-import { KIND_META, dueLabel, isOverdue, isShortfallOpen, kindLabel, turnOf } from '@/lib/shortfalls';
+import { KIND_META, dueLabel, isShortfallOpen, kindLabel, turnOf } from '@/lib/shortfalls';
 import { cn } from '@/lib/utils';
+import { ShortfallItems, type DecisionDraft, type ItemDraft } from './shortfall-items';
+import { ShortfallCycles } from './shortfall-cycles';
 import type { ShortfallActionResult, ShortfallDetail as Detail, UploadedAttachment } from './types';
 
 /**
- * One shortfall, end to end: what was asked, what is owed, what has been said
- * about it, and the one thing the reader can do next.
+ * One shortfall, end to end: what was asked, item by item; what has been said
+ * about it, cycle by cycle; and the one thing the reader can do next.
  *
  * ── The screen is built around whose move it is ──────────────────────────
  *
- * An applicant sees the required action, the items, the demand if there is
- * one, and a response box. An officer sees the same history and an accept /
- * reject pair. Neither sees the other's controls, because a form you cannot
- * submit is worse than no form.
+ * An applicant sees the required action, the items as a form, the demand if
+ * there is one, and a response box. An officer sees the same history and an
+ * accept / reject pair, per item and over the whole letter. Neither sees the
+ * other's controls, because a form you cannot submit is worse than no form.
  *
  * ── A fee shortfall shows the money and its state ────────────────────────
  *
@@ -65,7 +68,10 @@ export function ShortfallDetailView({
   const [response, setResponse] = React.useState('');
   const [remarks, setRemarks] = React.useState('');
   const [attachments, setAttachments] = React.useState<UploadedAttachment[]>([]);
+  const [itemDrafts, setItemDrafts] = React.useState<Record<string, ItemDraft>>({});
+  const [decisions, setDecisions] = React.useState<Record<string, DecisionDraft>>({});
   const [busy, setBusy] = React.useState<'respond' | 'accept' | 'reject' | 'upload' | null>(null);
+  const [uploadingItem, setUploadingItem] = React.useState<string | null>(null);
   const [withdrawing, setWithdrawing] = React.useState(false);
   const fileInput = React.useRef<HTMLInputElement>(null);
 
@@ -73,7 +79,7 @@ export function ShortfallDetailView({
 
   const open = isShortfallOpen(shortfall.status);
   const turn = turnOf(shortfall.status);
-  const overdue = isOverdue(shortfall.dueDate, shortfall.status);
+  const overdue = shortfall.sla.state === 'OVERDUE';
 
   const unpaid = shortfall.demands.filter((d) =>
     ['DRAFT', 'ISSUED', 'PARTIALLY_PAID'].includes(d.status)
@@ -81,6 +87,9 @@ export function ShortfallDetailView({
 
   const applicantTurn = open && turn === 'APPLICANT';
   const officerTurn = open && turn === 'OFFICER';
+
+  const itemMode: 'respond' | 'review' | 'read' =
+    applicantTurn && canRespond ? 'respond' : officerTurn && canReview ? 'review' : 'read';
 
   async function refresh() {
     try {
@@ -91,8 +100,25 @@ export function ShortfallDetailView({
     router.refresh();
   }
 
-  async function upload(file: File) {
-    setBusy('upload');
+  function updateDraft(itemId: string, next: Partial<ItemDraft>) {
+    setItemDrafts((current) => ({
+      ...current,
+      [itemId]: { response: '', remarks: '', attachments: [], ...current[itemId], ...next },
+    }));
+  }
+
+  function updateDecision(itemId: string, next: Partial<DecisionDraft>) {
+    setDecisions((current) => ({
+      ...current,
+      [itemId]: { decision: null, remarks: '', ...current[itemId], ...next },
+    }));
+  }
+
+  /** Uploads through the shortfall's own endpoint, scanned like any other file. */
+  async function uploadTo(file: File, itemId: string | null) {
+    if (itemId) setUploadingItem(itemId);
+    else setBusy('upload');
+
     try {
       const form = new FormData();
       form.append('file', file);
@@ -105,19 +131,52 @@ export function ShortfallDetailView({
       const body = (await result.json()) as UploadedAttachment & { error?: string };
       if (!result.ok) throw new ApiCallError(body.error ?? 'That file could not be attached.');
 
-      setAttachments((current) => [...current, body]);
+      if (itemId) {
+        updateDraft(itemId, {
+          attachments: [...(itemDrafts[itemId]?.attachments ?? []), body],
+        });
+      } else {
+        setAttachments((current) => [...current, body]);
+      }
+
       toast.success('Attached', { description: body.name });
     } catch (error) {
-      toast.error(error instanceof ApiCallError ? error.message : 'That file could not be attached.');
+      toast.error(
+        error instanceof ApiCallError ? error.message : 'That file could not be attached.'
+      );
     } finally {
+      setUploadingItem(null);
       setBusy(null);
       if (fileInput.current) fileInput.current.value = '';
     }
   }
 
   async function respond() {
-    if (!response.trim()) {
-      toast.error('Say what you have done about it.');
+    const items = Object.entries(itemDrafts)
+      .filter(([, draft]) => draft.response.trim().length > 0)
+      .map(([itemId, draft]) => ({
+        itemId,
+        response: draft.response.trim(),
+        applicantRemarks: draft.remarks.trim(),
+        attachments: draft.attachments.map((a) => ({
+          fileObjectId: a.fileObjectId,
+          name: a.name,
+          note: '',
+        })),
+      }));
+
+    // The covering response is what goes to the officer and into the record,
+    // so it is required even when every line has been answered. Rather than
+    // refuse a filled-in form over an empty summary box, the item answers are
+    // folded into one — the applicant has already said it, line by line.
+    const covering =
+      response.trim() ||
+      (items.length
+        ? items.map((item, i) => `${i + 1}. ${item.response}`).join('\n')
+        : '');
+
+    if (!covering) {
+      toast.error('Say what you have done about it — against the items, or in the summary.');
       return;
     }
 
@@ -126,14 +185,20 @@ export function ShortfallDetailView({
       const result = await api.post<ShortfallActionResult>(
         `/api/shortfalls/${shortfall.id}/respond`,
         {
-          response: response.trim(),
-          attachments: attachments.map((a) => ({ fileObjectId: a.fileObjectId, name: a.name, note: '' })),
+          response: covering,
+          attachments: attachments.map((a) => ({
+            fileObjectId: a.fileObjectId,
+            name: a.name,
+            note: '',
+          })),
+          items,
         }
       );
 
       toast.success(result.message, { description: shortfall.shortfallNumber });
       setResponse('');
       setAttachments([]);
+      setItemDrafts({});
       await refresh();
     } catch (error) {
       toast.error(error instanceof ApiCallError ? error.message : 'That did not work.');
@@ -148,17 +213,36 @@ export function ShortfallDetailView({
       return;
     }
 
+    const items = Object.entries(decisions)
+      .filter(([, d]) => d.decision !== null)
+      .map(([itemId, d]) => ({
+        itemId,
+        decision: d.decision as 'ACCEPTED' | 'REJECTED',
+        remarks: d.remarks.trim(),
+      }));
+
+    // Rejecting the letter while every line was ticked Accept is a
+    // contradiction the server would happily record. Caught here, where the
+    // officer can still see which ticks they meant.
+    if (!accept && items.length > 0 && items.every((i) => i.decision === 'ACCEPTED')) {
+      toast.error(
+        'Every item is marked accepted, so there is nothing to send back. Reject the item that is still wrong, or accept the shortfall.'
+      );
+      return;
+    }
+
     setBusy(accept ? 'accept' : 'reject');
     try {
       const result = await api.post<ShortfallActionResult>(
         `/api/shortfalls/${shortfall.id}/review`,
-        { accept, remarks: remarks.trim() }
+        { accept, remarks: remarks.trim(), items }
       );
 
       toast.success(result.message, {
         description: result.movedTo ? `The file is now at ${stageName(result.movedTo)}.` : undefined,
       });
       setRemarks('');
+      setDecisions({});
       await refresh();
     } catch (error) {
       toast.error(error instanceof ApiCallError ? error.message : 'That did not work.');
@@ -180,16 +264,19 @@ export function ShortfallDetailView({
     }
   }
 
+  const rejectedCount = Object.values(decisions).filter((d) => d.decision === 'REJECTED').length;
+
   return (
     <div className="space-y-5">
-      {/* ── What was asked ────────────────────────────────────────────────── */}
+      {/* ── The header: everything a reader needs to place this file ──────── */}
       <Card>
-        <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
+        <CardHeader className="flex-row flex-wrap items-start justify-between gap-4 space-y-0">
           <div className="min-w-0">
             <CardTitle className="flex flex-wrap items-center gap-2">
               {shortfall.title}
               <StatusBadge kind="shortfall" status={shortfall.status} />
               <Badge tone="outline">{kindLabel(shortfall.kind)}</Badge>
+              {shortfall.cycle > 1 && <Badge tone="warning">Cycle {shortfall.cycle}</Badge>}
               {shortfall.mode === 'REPORTED' && <Badge tone="info">Travels with the file</Badge>}
             </CardTitle>
             <CardDescription>
@@ -199,8 +286,8 @@ export function ShortfallDetailView({
             </CardDescription>
           </div>
 
-          {shortfall.dueDate && open && (
-            <div className="shrink-0 text-right">
+          <div className="flex shrink-0 items-start gap-3">
+            {shortfall.dueDate && open && (
               <p
                 className={cn(
                   'flex items-center gap-1 text-small tabular-nums',
@@ -210,12 +297,62 @@ export function ShortfallDetailView({
                 <Clock className="size-4" aria-hidden />
                 {dueLabel(shortfall.dueDate)}
               </p>
-            </div>
-          )}
+            )}
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="secondary" size="sm" asChild>
+                  <a
+                    href={`/api/shortfalls/${shortfall.id}/letter`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <FileText />
+                    Letter
+                  </a>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                Opens the shortfall letter as a PDF — the notice as the applicant receives it.
+              </TooltipContent>
+            </Tooltip>
+          </div>
         </CardHeader>
 
         <CardContent className="space-y-4">
-          <div>
+          <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Fact label="Shortfall number" value={shortfall.shortfallNumber} />
+            <Fact
+              label="Application"
+              value={
+                <Link
+                  href={`/applications/${shortfall.application.id}`}
+                  className="text-primary hover:underline"
+                >
+                  {shortfall.application.applicationNumber}
+                </Link>
+              }
+            />
+            <Fact label="Cycle" value={`${shortfall.cycle}`} />
+            <Fact label="Current status" value={<StatusBadge kind="shortfall" status={shortfall.status} />} />
+            <Fact label="Current desk" value={stageName(shortfall.application.currentStageCode)} />
+            <Fact label="Raised by" value={shortfall.raisedByName || '—'} />
+            <Fact label="Raised date" value={new Date(shortfall.raisedAt).toLocaleDateString()} />
+            <Fact
+              label="Due date"
+              value={
+                shortfall.dueDate ? (
+                  <span className={overdue ? 'font-medium text-danger' : undefined}>
+                    {new Date(shortfall.dueDate).toLocaleDateString()}
+                  </span>
+                ) : (
+                  'No date set'
+                )
+              }
+            />
+          </dl>
+
+          <div className="border-t border-border pt-3">
             <p className="text-caption text-text-muted">What is wrong</p>
             <p className="text-body text-text">{shortfall.description}</p>
           </div>
@@ -226,51 +363,41 @@ export function ShortfallDetailView({
               <p className="text-body font-medium text-text">{shortfall.requiredAction}</p>
             </div>
           )}
+        </CardContent>
+      </Card>
 
-          {shortfall.items.length > 0 && (
-            <div>
-              <p className="mb-1.5 text-caption text-text-muted">
-                {shortfall.kind === 'FEE' ? 'Amounts' : 'Items'}
-              </p>
-              <ul className="divide-y divide-border rounded border border-border">
-                {shortfall.items.map((item) => (
-                  <li key={item.id} className="flex items-baseline justify-between gap-3 px-3 py-2">
-                    <span className="flex min-w-0 items-baseline gap-2">
-                      {item.isResolved ? (
-                        <CircleCheck className="size-4 shrink-0 text-success" aria-hidden />
-                      ) : (
-                        <span className="size-4 shrink-0" aria-hidden />
-                      )}
-                      <span className={cn('text-small', item.isResolved && 'text-text-muted line-through')}>
-                        {item.description}
-                      </span>
-                      {item.documentTypeName && (
-                        <Badge tone="outline">{item.documentTypeName}</Badge>
-                      )}
-                    </span>
-                    {item.amount && (
-                      <span className="shrink-0 tabular-nums text-text">
-                        {formatMoney(Number(item.amount))}
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+      {/* ── The items ─────────────────────────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex flex-wrap items-center gap-2">
+            Items
+            <Badge tone={shortfall.pendingItems ? 'warning' : 'success'}>
+              {shortfall.resolvedItems} of {shortfall.itemCount} resolved
+            </Badge>
+            {shortfall.mandatoryPendingItems > 0 && (
+              <Badge tone="danger">{shortfall.mandatoryPendingItems} mandatory outstanding</Badge>
+            )}
+          </CardTitle>
+          <CardDescription>
+            {itemMode === 'respond'
+              ? 'Answer each item below. What you write against an item is kept with that item, through every cycle.'
+              : itemMode === 'review'
+                ? 'Decide each item. Rejecting one sends the whole shortfall back, and the applicant fixes the lines you rejected.'
+                : 'Each deficiency, with what was said about it and what was decided.'}
+          </CardDescription>
+        </CardHeader>
 
-          <p className="text-caption text-text-muted">
-            On application{' '}
-            <Link
-              href={`/applications/${shortfall.application.id}`}
-              className="text-primary hover:underline"
-            >
-              {shortfall.application.applicationNumber}
-            </Link>
-            {shortfall.application.currentStageCode
-              ? ` · now at ${stageName(shortfall.application.currentStageCode)}`
-              : ''}
-          </p>
+        <CardContent>
+          <ShortfallItems
+            items={shortfall.items}
+            mode={itemMode}
+            drafts={itemDrafts}
+            onDraftChange={updateDraft}
+            decisions={decisions}
+            onDecisionChange={updateDecision}
+            onUpload={(itemId, file) => void uploadTo(file, itemId)}
+            uploading={uploadingItem}
+          />
         </CardContent>
       </Card>
 
@@ -296,7 +423,9 @@ export function ShortfallDetailView({
                   <StatusBadge kind="demand" status={demand.status} />
                 </span>
                 <span className="flex items-baseline gap-4">
-                  <span className="tabular-nums text-text">{formatMoney(Number(demand.totalAmount))}</span>
+                  <span className="tabular-nums text-text">
+                    {formatMoney(Number(demand.totalAmount))}
+                  </span>
                   {viewerIsApplicant && ['ISSUED', 'PARTIALLY_PAID'].includes(demand.status) && (
                     <Button size="sm" asChild>
                       <Link href={`/applications/${shortfall.application.id}?tab=payments`}>
@@ -325,14 +454,18 @@ export function ShortfallDetailView({
           </CardHeader>
 
           <CardContent className="space-y-3">
-            <Field label="What have you done?" htmlFor="shortfall-response" required>
+            <Field label="Covering note" htmlFor="shortfall-response">
               <Textarea
                 id="shortfall-response"
-                rows={4}
+                rows={3}
                 value={response}
                 onChange={(e) => setResponse(e.target.value)}
                 maxLength={4000}
-                placeholder="A certificate dated this month has been uploaded on the Documents tab."
+                placeholder={
+                  shortfall.itemCount
+                    ? 'Optional — your item answers above are sent as the response if you leave this empty.'
+                    : 'A certificate dated this month has been uploaded on the Documents tab.'
+                }
               />
             </Field>
 
@@ -343,7 +476,7 @@ export function ShortfallDetailView({
                 className="sr-only"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) void upload(file);
+                  if (file) void uploadTo(file, null);
                 }}
               />
 
@@ -404,9 +537,9 @@ export function ShortfallDetailView({
           <CardHeader>
             <CardTitle>Your decision</CardTitle>
             <CardDescription>
-              Accepting settles the shortfall{shortfall.mode === 'BLOCKING' ? ' and resumes the review' : ''}.
-              Rejecting sends it back to the applicant for another attempt — both attempts stay on the
-              record.
+              Accepting settles the shortfall
+              {shortfall.mode === 'BLOCKING' ? ' and resumes the review' : ''}. Rejecting sends it
+              back to the applicant for another cycle — both attempts stay on the record.
             </CardDescription>
           </CardHeader>
 
@@ -417,6 +550,14 @@ export function ShortfallDetailView({
                 {unpaid.map((d) => d.demandNumber).join(', ')} {unpaid.length === 1 ? 'is' : 'are'}{' '}
                 still unpaid. This shortfall cannot be accepted until the payment shows against the
                 demand.
+              </p>
+            )}
+
+            {rejectedCount > 0 && (
+              <p className="flex items-start gap-2 rounded border border-border bg-surface-sunk px-3 py-2 text-small text-text-muted">
+                <Ban className="mt-0.5 size-4 shrink-0 text-danger" aria-hidden />
+                {rejectedCount} {rejectedCount === 1 ? 'item is' : 'items are'} marked for
+                rejection. Rejecting the shortfall sends it back with those lines named.
               </p>
             )}
 
@@ -441,7 +582,11 @@ export function ShortfallDetailView({
                 <CircleCheck />
                 Accept
               </Button>
-              <Button variant="destructive" loading={busy === 'reject'} onClick={() => review(false)}>
+              <Button
+                variant="destructive"
+                loading={busy === 'reject'}
+                onClick={() => review(false)}
+              >
                 <X />
                 Reject
               </Button>
@@ -454,9 +599,18 @@ export function ShortfallDetailView({
       <Card>
         <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
           <div>
-            <CardTitle>Responses</CardTitle>
+            <CardTitle>
+              Cycles
+              {shortfall.resolutions.length > 0 && (
+                <span className="ml-2 text-small font-normal text-text-muted">
+                  {shortfall.resolutions.length}{' '}
+                  {shortfall.resolutions.length === 1 ? 'response' : 'responses'} on record
+                </span>
+              )}
+            </CardTitle>
             <CardDescription>
-              Every attempt, in order. A rejected response is kept beside the one that replaced it.
+              Every attempt, newest first. A rejected response is kept beside the one that replaced
+              it — nothing here is ever overwritten.
             </CardDescription>
           </div>
 
@@ -469,56 +623,14 @@ export function ShortfallDetailView({
         </CardHeader>
 
         <CardContent>
-          {shortfall.resolutions.length === 0 ? (
-            <p className="text-small text-text-muted">
-              {applicantTurn
+          <ShortfallCycles
+            resolutions={shortfall.resolutions}
+            emptyMessage={
+              applicantTurn
                 ? 'You have not responded yet.'
-                : 'The applicant has not responded yet.'}
-            </p>
-          ) : (
-            <ol className="space-y-3">
-              {shortfall.resolutions.map((resolution) => (
-                <li key={resolution.id} className="rounded border border-border p-3">
-                  <p className="flex flex-wrap items-center gap-2 text-caption text-text-muted">
-                    <MessageSquare className="size-3.5" aria-hidden />
-                    Attempt {resolution.attemptNo} · {resolution.respondedByName} ·{' '}
-                    {new Date(resolution.respondedAt).toLocaleString()}
-                    {resolution.reviewedAt ? (
-                      resolution.accepted ? (
-                        <Badge tone="success">Accepted</Badge>
-                      ) : (
-                        <Badge tone="danger">Not accepted</Badge>
-                      )
-                    ) : (
-                      <Badge tone="info">Awaiting a decision</Badge>
-                    )}
-                  </p>
-
-                  <p className="mt-1 text-small text-text">{resolution.response}</p>
-
-                  {Array.isArray(resolution.attachments) && resolution.attachments.length > 0 && (
-                    <ul className="mt-2 space-y-1">
-                      {resolution.attachments.map((attachment, i) => (
-                        <li
-                          key={i}
-                          className="flex items-center gap-2 text-caption text-text-muted"
-                        >
-                          <Paperclip className="size-3.5" aria-hidden />
-                          {attachment.name ?? 'Attachment'}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-
-                  {resolution.reviewedAt && resolution.reviewRemarks && (
-                    <p className="mt-2 border-t border-border pt-2 text-caption text-text-muted">
-                      {resolution.reviewedByName}: {resolution.reviewRemarks}
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ol>
-          )}
+                : 'The applicant has not responded yet.'
+            }
+          />
 
           {shortfall.closedAt && (
             <p className="mt-3 border-t border-border pt-3 text-caption text-text-muted">
@@ -541,6 +653,15 @@ export function ShortfallDetailView({
         reasonLabel="Why is it being withdrawn?"
         onConfirm={withdraw}
       />
+    </div>
+  );
+}
+
+function Fact({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-caption text-text-muted">{label}</dt>
+      <dd className="mt-0.5 text-small text-text">{value}</dd>
     </div>
   );
 }

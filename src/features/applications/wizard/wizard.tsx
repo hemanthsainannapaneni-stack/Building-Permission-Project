@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { toast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
-import { WIZARD_STEPS, stepAt, type StepKey } from '@/lib/application-steps';
+import { WIZARD_REQUIRES_FIELDS_TO_ADVANCE, WIZARD_STEPS, stepAt, type StepKey } from '@/lib/application-steps';
 import { STEP_SCHEMAS, isDataStepKey, type DataStepKey } from '@/lib/schemas/applications';
 import { api, ApiCallError } from '../api';
 import type { ApplicationMeta, WizardState } from '../types';
@@ -209,7 +209,7 @@ function StepForm({
   });
 
   const save = React.useCallback(
-    async (data: FieldValues, partial: boolean) => {
+    async (data: FieldValues, partial: boolean, quiet = false) => {
       setBusy(true);
       setFormError(null);
       try {
@@ -221,6 +221,8 @@ function StepForm({
         onSaved(next, new Date());
         return next;
       } catch (error) {
+        // A quiet attempt reports nothing: the caller falls back to a draft.
+        if (quiet) return null;
         if (error instanceof ApiCallError) {
           // Field errors from the server land on the inputs they belong to,
           // so a server-only rule still reads like ordinary validation.
@@ -257,10 +259,24 @@ function StepForm({
     return () => clearInterval(timer);
   }, [form, save, busy]);
 
-  const onNext = form.handleSubmit(async (data) => {
+  const enforced = form.handleSubmit(async (data) => {
     const next = await save(data, false);
     if (next) onAdvance();
   });
+
+  /**
+   * See WIZARD_REQUIRES_FIELDS_TO_ADVANCE. The step is saved for real when the
+   * server accepts it; otherwise what was typed is kept as a draft. Either
+   * way the user moves on.
+   */
+  const relaxed = async (event?: React.BaseSyntheticEvent) => {
+    event?.preventDefault();
+    const data = form.getValues();
+    const next = (await save(data, false, true)) ?? (await save(data, true));
+    if (next) onAdvance();
+  };
+
+  const onNext = WIZARD_REQUIRES_FIELDS_TO_ADVANCE ? enforced : relaxed;
 
   const onSaveDraft = async () => {
     // No validation: the point of Save draft is that it always works.

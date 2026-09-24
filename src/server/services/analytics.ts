@@ -3,7 +3,7 @@ import type { Prisma, ShortfallStatus } from '@prisma/client';
 import { prisma } from '@/server/db/prisma';
 import { applicationScope } from '@/server/auth/scope';
 import type { AuthUser } from '@/server/auth/context';
-import { BUCKETS } from '@/lib/application-buckets';
+import { BUCKETS, SHORTFALL as SHORTFALL_STATUSES } from '@/lib/application-buckets';
 import { CLOSED_SHORTFALL_STATUSES, TERMINAL_STATUSES } from '@/lib/constants';
 
 /**
@@ -15,8 +15,9 @@ import { CLOSED_SHORTFALL_STATUSES, TERMINAL_STATUSES } from '@/lib/constants';
  * five call sites below.
  */
 const CLOSED = [...CLOSED_SHORTFALL_STATUSES] as ShortfallStatus[];
-import { STAGE_LABELS } from '@/lib/workflow';
+import { STAGE_LABELS, deskForStageCode } from '@/lib/workflow';
 import { memoizeAsync } from '@/server/cache/memoize';
+import { OUTSTANDING_NOC_STATUSES } from '@/lib/noc';
 
 /**
  * EVERY NUMBER ON EVERY DASHBOARD COMES FROM HERE.
@@ -690,6 +691,138 @@ export async function workload(user: AuthUser): Promise<WorkloadRow[]> {
 // The whole picture
 // ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * Approvals, permission orders and the notification backlog.
+ *
+ * ── Every figure here is a live count, and several are deliberately blunt ──
+ *
+ * `approvalPending` counts files sitting at a desk that can actually approve
+ * them — read from the workflow configuration, not from a list of stage codes,
+ * so a chain that gains an approving desk is counted without anybody editing
+ * this file.
+ *
+ * `notificationsPending` counts OUTBOX rows the dispatcher has not processed.
+ * That is the number that means something operationally: a backlog here means
+ * people have not been told things the system has already decided, which is
+ * the failure the transactional outbox exists to make visible. It is NOT the
+ * count of unread in-app notifications, which measures whether users read
+ * their inbox and is nobody's problem to fix.
+ */
+export type ApprovalSummary = {
+  /** Files at a desk that can approve them, waiting for a decision. */
+  approvalPending: number;
+  /** Permission orders released to applicants. */
+  ordersIssued: number;
+  /** Drafted or generated, not yet issued — work waiting at the signing desk. */
+  ordersPending: number;
+  /** Orders that were issued and later revoked. */
+  ordersRevoked: number;
+  /** Undispatched outbox rows: people who have not been told yet. */
+  notificationsPending: number;
+  /** Outbox rows the dispatcher gave up on. Always worth showing. */
+  notificationsFailed: number;
+};
+
+export async function approvalSummary(user: AuthUser): Promise<ApprovalSummary> {
+  const scope = liveApplications(user);
+
+  const [orderGroups, revoked, approvalPending, outbox] = await Promise.all([
+    prisma.approvalOrder.groupBy({
+      by: ['status'],
+      where: { application: scope },
+      _count: { _all: true },
+    }),
+    prisma.approvalOrder.count({ where: { application: scope, revokedAt: { not: null } } }),
+    // "At a desk that can approve" — asked of the transition table rather than
+    // asserted about a stage code. `WorkflowInstance` carries the stage as a
+    // plain id with no relation, so the set of approving stages is resolved
+    // first and matched by id.
+    approvingStageIds(user).then((stageIds) =>
+      stageIds.length === 0
+        ? 0
+        : prisma.application.count({
+            where: {
+              ...scope,
+              status: { notIn: ['APPROVED', 'REJECTED', 'DRAFT'] },
+              workflowInstance: { status: 'ACTIVE', currentStageId: { in: stageIds } },
+            },
+          })
+    ),
+    // The outbox has no status column: `processed` is the flag, and a row that
+    // has been tried and is still unprocessed carries the error that stopped
+    // it. Pending and failed are therefore both subsets of unprocessed, and
+    // failed is the subset somebody has to do something about.
+    Promise.all([
+      prisma.outboxEvent.count({ where: { processed: false } }),
+      prisma.outboxEvent.count({ where: { processed: false, attempts: { gte: 1 } } }),
+    ]),
+  ]);
+
+  const byStatus: Record<string, number> = {};
+  for (const row of orderGroups) byStatus[row.status] = row._count._all;
+
+  const [pending, failed] = outbox;
+
+  return {
+    approvalPending,
+    ordersIssued: byStatus.ISSUED ?? 0,
+    ordersPending:
+      (byStatus.DRAFT ?? 0) + (byStatus.PREVIEW ?? 0) + (byStatus.GENERATED ?? 0) + (byStatus.APPROVED ?? 0),
+    ordersRevoked: revoked,
+    notificationsPending: pending,
+    notificationsFailed: failed,
+  };
+}
+
+/**
+ * Stages an APPROVE transition actually leaves, in the workflows in use.
+ *
+ * Read from configuration so the count follows a chain that is edited rather
+ * than a list of stage codes somebody has to remember to update. Memoised for
+ * a minute because it changes only when an administrator republishes a
+ * workflow, and it is asked on every dashboard render.
+ */
+async function approvingStageIds(_user: AuthUser): Promise<string[]> {
+  return memoizeAsync('analytics:approving-stages', 60, async () => {
+    const rows = await prisma.workflowTransition.findMany({
+      where: { isActive: true, action: { code: 'APPROVE' } },
+      select: { fromStageId: true },
+      distinct: ['fromStageId'],
+    });
+    return rows.map((r) => r.fromStageId);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NOCs
+// ═══════════════════════════════════════════════════════════════════════════
+
+export type NocDashboardSummary = {
+  total: number;
+  /** Not yet verified and not ruled out — src/lib/noc.ts OUTSTANDING_NOC_STATUSES. */
+  pending: number;
+  /** RECEIVED: the certificate is in, the desk has not verified it. */
+  awaitingVerification: number;
+  verified: number;
+};
+
+export async function nocDashboardSummary(user: AuthUser): Promise<NocDashboardSummary> {
+  const groups = await prisma.applicationNoc.groupBy({
+    by: ['status'],
+    where: throughApplication(user),
+    _count: { _all: true },
+  });
+  const by: Record<string, number> = {};
+  for (const g of groups) by[g.status] = g._count._all;
+  const total = Object.values(by).reduce((a, b) => a + b, 0);
+  return {
+    total,
+    pending: OUTSTANDING_NOC_STATUSES.reduce((sum, s) => sum + (by[s] ?? 0), 0),
+    awaitingVerification: by.RECEIVED ?? 0,
+    verified: by.VERIFIED ?? 0,
+  };
+}
+
 export type DashboardData = {
   applications: ApplicationOverview;
   finance: FinanceSummary;
@@ -697,15 +830,17 @@ export type DashboardData = {
   documents: DocumentSummary;
   shortfalls: ShortfallSummary;
   sla: SlaSummary;
+  approvals: ApprovalSummary;
   trend: TrendPoint[];
   activity: ActivityEntry[];
   workload: WorkloadRow[];
+  nocs: NocDashboardSummary;
 };
 
 /** One round trip's worth of parallel queries, for the executive dashboards. */
 export async function dashboardData(user: AuthUser, options: { months?: number } = {}): Promise<DashboardData> {
   return memoizeAsync(`analytics:dashboard:${user.id}:${user.roleKeys.join(',')}:${options.months ?? 9}`, 60, async () => {
-    const [applications, finance, scrutiny, documents, shortfalls, sla, trend, activity, load] =
+    const [applications, finance, scrutiny, documents, shortfalls, sla, approvals, trend, activity, load, nocs] =
       await Promise.all([
         applicationOverview(user),
         financeSummary(user),
@@ -713,12 +848,26 @@ export async function dashboardData(user: AuthUser, options: { months?: number }
         documentSummary(user),
         shortfallSummary(user),
         slaSummary(user),
+        approvalSummary(user),
         applicationTrend(user, options.months ?? 9),
         recentActivity(user, 12),
         workload(user),
+        nocDashboardSummary(user),
       ]);
 
-    return { applications, finance, scrutiny, documents, shortfalls, sla, trend, activity, workload: load };
+    return {
+      applications,
+      finance,
+      scrutiny,
+      documents,
+      shortfalls,
+      sla,
+      approvals,
+      trend,
+      activity,
+      workload: load,
+      nocs,
+    };
   });
 }
 
@@ -767,8 +916,12 @@ export async function deskConsolidation(user: AuthUser): Promise<DeskRow[]> {
   const scoped = liveApplications(user);
 
   const [workflow, byStage, tasks, shortfalls, roleCounts] = await Promise.all([
+    // The desks of the workflow new applications actually run through. There
+    // is more than one published workflow now — BBAS_STANDARD is the default
+    // and BP_STANDARD is retained as an option — so "any published one" would
+    // have picked a chain at random and drawn the wrong desks.
     prisma.workflow.findFirst({
-      where: { isPublished: true },
+      where: { isPublished: true, applicationTypes: { some: { deletedAt: null } } },
       orderBy: { version: 'desc' },
       select: {
         stages: {
@@ -823,7 +976,18 @@ export async function deskConsolidation(user: AuthUser): Promise<DeskRow[]> {
   const applicationsAt = new Map(
     byStage.filter((r) => r.currentStageCode).map((r) => [r.currentStageCode!, r._count._all])
   );
-  const shortfallsAt = new Map(shortfalls.map((r) => [r.raisedAtStageCode, r._count._all]));
+  // A shortfall raised at a BP_STANDARD desk is still open work, and its file
+  // now waits at a BBAS desk. `raisedAtStageCode` is history and stays as it
+  // is; this only decides which row of the panel counts it. Without the
+  // forwarding, five open shortfalls raised at the old Director and
+  // Commissioner desks were attributed to no desk at all and vanished from the
+  // panel while still blocking their applications' approval.
+  const deskCodes = new Set((workflow?.stages ?? []).map((s) => s.code));
+  const shortfallsAt = new Map<string, number>();
+  for (const row of shortfalls) {
+    const desk = deskForStageCode(row.raisedAtStageCode, deskCodes);
+    shortfallsAt.set(desk, (shortfallsAt.get(desk) ?? 0) + row._count._all);
+  }
   const activeByRole = new Map(roleCounts.map((r) => [r.key, r._count.users]));
 
   const now = Date.now();
@@ -898,18 +1062,12 @@ export async function applicantSideSummary(user: AuthUser): Promise<ApplicantSid
     documentsPending: n('SCRUTINY_PASSED', 'DOCUMENT_UPLOAD_PENDING'),
     awaitingPayment: n('DOCUMENTS_COMPLETED', 'FEE_GENERATED', 'PAYMENT_PENDING'),
     paymentFailed: n('PAYMENT_FAILED'),
-    withApplicant: n(
-      'RETURNED_TO_APPLICANT',
-      'TPA_DOCUMENT_SHORTFALL',
-      'TPA_FEE_SHORTFALL',
-      'TPA_TECHNICAL_SHORTFALL',
-      'ZAD_ZDD_SHORTFALL',
-      'ZJD_SHORTFALL',
-      'ZJD_FEE_SHORTFALL',
-      'DIRECTOR_SHORTFALL',
-      'ADDITIONAL_COMMISSIONER_SHORTFALL',
-      'COMMISSIONER_SHORTFALL'
-    ),
+    // Read from the shared bucket rather than re-listed here. This used to be
+    // its own copy of the same statuses and drifted the moment a desk was
+    // added: three files parked at the new ZDD desk fell out of the partition
+    // entirely, and the dashboard's headline strip stopped adding up to the
+    // register. One list, one place.
+    withApplicant: n(...SHORTFALL_STATUSES),
     responded: n('SHORTFALL_RESPONDED'),
   };
 

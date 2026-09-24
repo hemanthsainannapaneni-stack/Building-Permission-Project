@@ -3,7 +3,6 @@
 import * as React from 'react';
 import { ChevronRight, ChevronLeft, Menu } from 'lucide-react';
 import { Sidebar } from './sidebar';
-import { Breadcrumb } from './breadcrumb';
 import { GlobalSearch } from './global-search';
 import { NotificationBell } from './notification-bell';
 import { ProfileMenu } from './profile-menu';

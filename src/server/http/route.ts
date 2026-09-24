@@ -20,10 +20,34 @@ import { serialize } from './serialize';
  * plain data and never deal with status codes on the failure paths.
  */
 
+/**
+ * The dynamic segments an API route may declare, and the value each carries.
+ *
+ * Named rather than left as an open `Record<string, string>` on purpose. Under
+ * `noUncheckedIndexedAccess` an open index signature makes every read
+ * `string | undefined`, which would put a `!` on the first line of every
+ * `[id]` route and assert nothing anybody did not already know — the segment
+ * is present because the handler lives at a path that declares it, and the
+ * router will not dispatch to it otherwise.
+ *
+ * Naming the segments this API actually uses keeps the strictness
+ * everywhere it earns its keep, and makes a route that reads a segment its
+ * path does not declare a compile error rather than a runtime `undefined`.
+ */
+export type RouteParams = {
+  id: string;
+  code: string;
+  photoId: string;
+  componentId: string;
+  ruleId: string;
+  provider: string;
+  ref: string;
+};
+
 export type RouteContext<Body = unknown> = {
   req: NextRequest;
   /** Dynamic segment values, already awaited. */
-  params: Record<string, string>;
+  params: RouteParams;
   searchParams: URLSearchParams;
   /** Null only on routes declared `auth: false`. */
   user: AuthUser;
@@ -104,11 +128,14 @@ export function defineRoute<Body>(handler: Handler<any>, options: Options<Body> 
 
     try {
       const rawParams = args?.params ? await args.params : {};
-      const params: Record<string, string> = {};
+      const collected: Record<string, string> = {};
       for (const [key, value] of Object.entries(rawParams)) {
         const v = Array.isArray(value) ? value[0] : value;
-        if (v !== undefined) params[key] = v;
+        if (v !== undefined) collected[key] = v;
       }
+      // Only the segments this route's path declares are present. The cast
+      // states what the router guarantees — see RouteParams.
+      const params = collected as RouteParams;
 
       const user = auth ? await requireAuthUser() : await getAuthUser();
       const ip = clientIp(req);

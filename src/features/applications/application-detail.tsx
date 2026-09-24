@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Lock, Pencil, Trash2, Clock, CircleCheck, ArrowRight } from 'lucide-react';
+import { Lock, Pencil, Trash2, Clock, CircleCheck, ArrowRight, TriangleAlert } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,21 +16,48 @@ import { toast } from '@/components/ui/toast';
 import { stageLabel } from '@/lib/status';
 import { isShortfallOpen } from '@/lib/shortfalls';
 import { WIZARD_STEPS } from '@/lib/application-steps';
+import {
+  boundaryFacts,
+  generalInformationFacts,
+  plotAreaFacts,
+  plotAreaWarnings,
+  plotConstraintFacts,
+  professionalFacts,
+} from '@/lib/bbas-fields';
 import { cn } from '@/lib/utils';
 import { api, ApiCallError } from './api';
 import { visibleTabs, isTabKey, type TabDef } from './application-tabs';
 import { ApplicationTimeline } from './application-timeline';
 import { AuditPanel, type AuditRow } from './audit-panel';
+import { ChecklistTab } from '@/features/checklist/checklist-tab';
+import { OthersTab } from '@/features/others/others-tab';
 import { DrawingsTab } from '@/features/drawings/drawings-tab';
+import { BimTab } from '@/features/bim/bim-tab';
 import { ScrutinyTab } from '@/features/scrutiny/scrutiny-tab';
 import { DocumentsTab } from '@/features/documents/documents-tab';
 import { FeesTab } from '@/features/fees/fees-tab';
 import { PaymentsTab } from '@/features/payments/payments-tab';
 import { WorkflowTab } from '@/features/workflow/workflow-tab';
+import { SiteInspectionTab } from '@/features/inspections/site-inspection-tab';
+import type { ApplicationInspectionsPayload } from '@/features/inspections/types';
+import { NocTab } from '@/features/nocs/noc-tab';
+import type { ApplicationNocsPayload } from '@/features/nocs/types';
+import { ProceedingsTab } from '@/features/proceedings/proceedings-tab';
+import type { ApplicationProceedingsPayload } from '@/features/proceedings/types';
+import { ProfessionalTab } from '@/features/professional-change/tab';
+import type { ApplicationProfessionalPayload } from '@/features/professional-change/types';
+import { CommencementPanel } from '@/features/commencement/panel';
+import type { ApplicationCommencementPayload } from '@/features/commencement/types';
+import { OccupancyPanel } from '@/features/occupancy/panel';
+import type { ApplicationOccupancyPayload } from '@/features/occupancy/types';
+import { OrderPanel, type OrderView } from '@/features/approvals/order-panel';
 import { ShortfallPanel } from '@/features/workflow/shortfall-panel';
 import { ShortfallBanner } from '@/features/shortfalls/shortfall-banner';
 import type { ShortfallRow } from '@/features/shortfalls/types';
+import type { ChecklistPayload } from '@/features/checklist/types';
+import type { OthersPayload } from '@/features/others/types';
 import type { DrawingsPayload, ScrutinyPayload } from '@/features/drawings/types';
+import type { BimPayload } from '@/features/bim/types';
 import type { DocumentsPayload } from '@/features/documents/types';
 import type { FeesPayload } from '@/features/fees/types';
 import type { PaymentsPayload } from '@/features/payments/types';
@@ -56,12 +83,16 @@ export function ApplicationDetailView({
   capabilities,
   canEdit,
   canDelete,
+  checklist,
+  others,
   drawings,
+  bim,
   scrutiny,
   documents,
   fees,
   payments,
   canUploadDrawing,
+  canReviewBim,
   canRequestScrutiny,
   canUploadDocument,
   canVerifyDocument,
@@ -75,6 +106,14 @@ export function ApplicationDetailView({
   audit,
   openShortfalls,
   viewerIsApplicant,
+  order,
+  canAdvanceOrder,
+  inspections,
+  nocs,
+  proceedings,
+  professional,
+  commencement,
+  occupancy,
 }: {
   application: Detail;
   timeline: TimelineEvent[];
@@ -82,7 +121,12 @@ export function ApplicationDetailView({
   capabilities: string[];
   canEdit: boolean;
   canDelete: boolean;
+  /** Null when the caller holds no CHECKLIST_VIEW — the tab is hidden anyway. */
+  checklist: ChecklistPayload | null;
+  others: OthersPayload;
   drawings: DrawingsPayload;
+  /** Null when the caller holds no DRAWING_VIEW — the tab is hidden anyway. */
+  bim: BimPayload | null;
   scrutiny: ScrutinyPayload;
   /** Null when the caller holds no DOCUMENT_VIEW — the tab is hidden anyway. */
   documents: DocumentsPayload | null;
@@ -91,6 +135,8 @@ export function ApplicationDetailView({
   /** Null when the caller holds no PAYMENT_VIEW. */
   payments: PaymentsPayload | null;
   canUploadDrawing: boolean;
+  /** Holds CHECKLIST_REVIEW — may record the department's verdict on the model. */
+  canReviewBim: boolean;
   canRequestScrutiny: boolean;
   canUploadDocument: boolean;
   canVerifyDocument: boolean;
@@ -108,6 +154,22 @@ export function ApplicationDetailView({
   /** Open shortfalls, for the banner that sits above every tab. */
   openShortfalls: ShortfallRow[];
   viewerIsApplicant: boolean;
+  /** Null until the application is approved and an order is drafted. */
+  order: OrderView | null;
+  /** Holds APPLICATION_APPROVE — may move the order along its lifecycle. */
+  canAdvanceOrder: boolean;
+  /** Null when the caller holds no SITE_INSPECTION_VIEW — the tab is hidden anyway. */
+  inspections: ApplicationInspectionsPayload | null;
+  /** Null when the caller holds no NOC_VIEW — the tab is hidden anyway. */
+  nocs: ApplicationNocsPayload | null;
+  /** Null when the caller holds no SHOW_CAUSE_VIEW — the tab is hidden anyway. */
+  proceedings: ApplicationProceedingsPayload | null;
+  /** Null when the caller holds no PROFESSIONAL_CHANGE_VIEW — the tab is hidden anyway. */
+  professional: ApplicationProfessionalPayload | null;
+  /** Null before approval, or when the caller holds no COMMENCEMENT_VIEW. */
+  commencement: ApplicationCommencementPayload | null;
+  /** Null before approval, or when the caller holds no OCCUPANCY_VIEW. */
+  occupancy: ApplicationOccupancyPayload | null;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -194,6 +256,14 @@ export function ApplicationDetailView({
           <Details application={application} meta={meta} />
         </TabsContent>
 
+        <TabsContent value="checklist">
+          {checklist && <ChecklistTab initial={checklist} applicationId={application.id} />}
+        </TabsContent>
+
+        <TabsContent value="others">
+          <OthersTab initial={others} applicationId={application.id} />
+        </TabsContent>
+
         <TabsContent value="drawings">
           <DrawingsTab
             initial={drawings}
@@ -202,8 +272,49 @@ export function ApplicationDetailView({
           />
         </TabsContent>
 
+        <TabsContent value="bim">
+          {bim && (
+            <BimTab
+              initial={bim}
+              canUpload={canUploadDrawing}
+              canReview={canReviewBim}
+              maxUploadBytes={drawings.maxUploadBytes}
+            />
+          )}
+        </TabsContent>
+
         <TabsContent value="scrutiny">
           <ScrutinyTab initial={scrutiny} canRequest={canRequestScrutiny} />
+        </TabsContent>
+
+        <TabsContent value="inspection">
+          {inspections && <SiteInspectionTab initial={inspections} />}
+        </TabsContent>
+
+        <TabsContent value="nocs">{nocs && <NocTab initial={nocs} />}</TabsContent>
+
+        <TabsContent value="proceedings">{proceedings && <ProceedingsTab initial={proceedings} />}</TabsContent>
+
+        <TabsContent value="professional">{professional && <ProfessionalTab initial={professional} />}</TabsContent>
+
+        <TabsContent value="commencement">
+          {commencement ? (
+            <CommencementPanel initial={commencement} />
+          ) : (
+            <p className="rounded border border-border bg-surface-sunk px-3 py-6 text-center text-small text-text-muted">
+              Post-approval work begins once the application is approved and its building permission order is issued.
+            </p>
+          )}
+        </TabsContent>
+
+        <TabsContent value="occupancy">
+          {occupancy ? (
+            <OccupancyPanel initial={occupancy} />
+          ) : (
+            <p className="rounded border border-border bg-surface-sunk px-3 py-6 text-center text-small text-text-muted">
+              Occupancy is applied for once the permission is granted, its order issued and work commenced.
+            </p>
+          )}
         </TabsContent>
 
         <TabsContent value="documents">
@@ -224,7 +335,17 @@ export function ApplicationDetailView({
           {payments && <PaymentsTab initial={payments} canInitiate={canInitiatePayment} />}
         </TabsContent>
 
-        <TabsContent value="workflow">
+        <TabsContent value="workflow" className="space-y-4">
+          {/* The permission itself sits above the movement history: on an
+              approved file it is the thing everybody opens this tab for. */}
+          {(order || application.status === 'APPROVED') && (
+            <OrderPanel
+              order={order}
+              canAdvance={canAdvanceOrder}
+              viewerIsApplicant={viewerIsApplicant}
+            />
+          )}
+
           {workflow && (
             <WorkflowTab
               applicationId={application.id}
@@ -584,6 +705,23 @@ function Details({ application, meta }: { application: Detail; meta: Application
   const label = (category: string, code: string) =>
     meta.master[category]?.find((o) => o.code === code)?.label ?? code;
 
+  /**
+   * The BBAS blocks, built from src/lib/bbas-fields.ts.
+   *
+   * Kept apart from the wizard-shaped groups below rather than merged into
+   * them, because the two answer different questions. The wizard grouping
+   * answers "which step do I go to in order to change this"; the BBAS
+   * grouping answers "where is the field the manual calls D.No". Somebody
+   * checking a file against a paper form needs the second and somebody
+   * correcting an entry needs the first, and one ordering cannot serve both.
+   */
+  const general = generalInformationFacts(application, label);
+  const professionals = professionalFacts(application);
+  const plotAreas = plotAreaFacts(application);
+  const constraints = plotConstraintFacts(application);
+  const boundaries = boundaryFacts(application);
+  const areaWarnings = plotAreaWarnings(application);
+
   const groups: Array<{ key: string; facts: Array<[string, string | number | null]> }> = [
     {
       key: 'applicant',
@@ -624,10 +762,8 @@ function Details({ application, meta }: { application: Detail; meta: Application
         ['Door number', property?.doorNo ?? null],
         ['Street', property?.streetName ?? null],
         ['PIN code', property?.pincode ?? null],
-        ['North', property?.boundaryNorth ?? null],
-        ['South', property?.boundarySouth ?? null],
-        ['East', property?.boundaryEast ?? null],
-        ['West', property?.boundaryWest ?? null],
+        // The four boundaries have a card of their own above, beside the site
+        // constraints they are read with.
         ['Latitude', property?.latitude ?? null],
         ['Longitude', property?.longitude ?? null],
       ],
@@ -682,6 +818,123 @@ function Details({ application, meta }: { application: Detail; meta: Application
 
   return (
     <div className="space-y-4">
+      {/*
+        ── General information ────────────────────────────────────────────
+        The BBAS block, in the manual's own order. Somebody checking this
+        screen against a paper form reads down both at once, and a screen that
+        reorders the same facts makes them do a lookup per line.
+      */}
+      <Card>
+        <CardHeader>
+          <CardTitle>General information</CardTitle>
+          <CardDescription>
+            The case particulars, in the order the BBAS form asks for them.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+            {general.map(([factLabel, value]) => (
+              <Fact key={factLabel} label={factLabel} value={value} />
+            ))}
+          </dl>
+        </CardContent>
+      </Card>
+
+      {/*
+        Left out entirely when there is no developer and no structural
+        engineer. A plot owner building their own house has neither, and that
+        is the ordinary case — a card full of "Not entered" would read as a
+        gap in the file rather than as the absence it is.
+      */}
+      {professionals.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Developer and professionals</CardTitle>
+            <CardDescription>
+              The other parties on record, and the registration each is entered under.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+              {professionals.map(([factLabel, value]) => (
+                <Fact key={factLabel} label={factLabel} value={value} />
+              ))}
+            </dl>
+          </CardContent>
+        </Card>
+      )}
+
+      {/*
+        ── The plot ───────────────────────────────────────────────────────
+        The area chain in the order the deductions are taken, so the
+        arithmetic is readable down the column rather than something the
+        reader has to reassemble.
+      */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Plot particulars</CardTitle>
+          <CardDescription>
+            The document area, what was found on the ground, and the deductions that give the net
+            plot area the FAR is worked against.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {/*
+            A disagreement in the figures is SHOWN and never silently
+            corrected — see the note at the top of src/lib/plot-area.ts. The
+            officer decides whether it is a shortfall.
+          */}
+          {areaWarnings.map((warning) => (
+            <p
+              key={warning}
+              className="flex items-start gap-2 rounded border border-warning/25 bg-warning-bg px-3 py-2 text-small text-warning"
+            >
+              <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+              {warning}
+            </p>
+          ))}
+
+          <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+            {plotAreas.map(([factLabel, value]) => (
+              <Fact key={factLabel} label={factLabel} value={value} />
+            ))}
+          </dl>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Site constraints</CardTitle>
+            <CardDescription>
+              All six are listed, including those that do not apply — an absent row cannot be told
+              apart from a question nobody asked.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+              {constraints.map(([factLabel, value]) => (
+                <Fact key={factLabel} label={factLabel} value={value} />
+              ))}
+            </dl>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Boundaries</CardTitle>
+            <CardDescription>What adjoins the plot on each side.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+              {boundaries.map(([factLabel, value]) => (
+                <Fact key={factLabel} label={factLabel} value={value} />
+              ))}
+            </dl>
+          </CardContent>
+        </Card>
+      </div>
+
       {groups.map((group) => {
         const step = WIZARD_STEPS.find((s) => s.key === group.key);
         return (

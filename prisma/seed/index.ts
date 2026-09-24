@@ -10,6 +10,8 @@ import { seedFees } from './08-fees';
 import { seedWorkflow } from './09-workflow';
 import { seedNotifications } from './10-notifications';
 import { seedSuperAdmin } from './11-superadmin';
+import { seedChecklists } from './12-checklists';
+import { seedNocTypes } from './13-noc-types';
 
 /**
  * Seed orchestrator.
@@ -92,6 +94,25 @@ async function main() {
       console.log(`                ${issue.severity}  ${issue.rule}: ${issue.message}`);
     }
   }
+
+  const checklists = await seedChecklists(prisma);
+  console.log(
+    `  Checklists  ${checklists.application.total}-point application · ` +
+      `${checklists.inspection.total}-point site inspection` +
+      `  (${checklists.application.created + checklists.inspection.created} new, ` +
+      `${checklists.application.refreshed + checklists.inspection.refreshed} refreshed, ` +
+      `${checklists.application.preserved + checklists.inspection.preserved} edited rows preserved)`
+  );
+  console.log(
+    '              PROVISIONAL WORDING — the BBAS manuals do not contain the question text. ' +
+      'See 12-checklists.ts.'
+  );
+
+  const nocTypes = await seedNocTypes(prisma);
+  console.log(
+    `  NOC types   ${nocTypes.total} (${nocTypes.active} active · ${nocTypes.created} new, ` +
+      `${nocTypes.preserved} kept as configured)`
+  );
 
   const notifications = await seedNotifications(prisma);
   console.log(

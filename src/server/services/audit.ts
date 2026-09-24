@@ -57,9 +57,13 @@ export async function audit(db: Db, input: AuditInput) {
 }
 
 async function append(db: Tx, input: AuditInput) {
+  try {
+    await db.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(8493829)`);
+  } catch {
+    // Non-postgres fallback
+  }
+
   const prev = await db.auditLog.findFirst({
-    // By `seq`, never by `occurredAt`: a millisecond timestamp is not a total
-    // order, and rows tie on it routinely.
     orderBy: { seq: 'desc' },
     select: { seq: true, rowHash: true },
   });

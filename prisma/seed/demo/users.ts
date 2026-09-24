@@ -86,6 +86,29 @@ export const DEMO_STAFF: DemoStaff[] = [
     employeeCode: 'TP-0025',
   },
   {
+    // Covers the zones po.demo does not, so no file can reach the Planning
+    // Officer desk and find nobody with jurisdiction over it.
+    email: 'po2.demo@example.com',
+    name: 'Bhaskar Reddy',
+    role: ROLES.PLANNING_OFFICER,
+    designation: 'Planning Officer',
+    officeCode: 'TP-Z4',
+    zoneCodes: ['Z4', 'Z5'],
+    phone: '9000000029',
+    employeeCode: 'TP-0029',
+  },
+  {
+    // Likewise for the ZDD desk: zdd.demo holds Z3 and Z4, this one the rest.
+    email: 'zdd2.demo@example.com',
+    name: 'Shalini Prasad',
+    role: ROLES.ZDD,
+    designation: 'Zonal Deputy Director',
+    officeCode: 'TP-Z1',
+    zoneCodes: ['Z1', 'Z2', 'Z5'],
+    phone: '9000000030',
+    employeeCode: 'TP-0030',
+  },
+  {
     email: 'zjd2.demo@example.com',
     name: 'Harish Pillai',
     role: ROLES.ZJD,

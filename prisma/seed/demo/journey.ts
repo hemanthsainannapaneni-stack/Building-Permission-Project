@@ -7,10 +7,13 @@ import {
   DISTRICTS,
   FIRST_NAMES,
   FORWARD_REMARKS,
+  ITEM_RESPONSE_TEXT,
   LAYOUTS,
   LOCALITIES,
   REJECTION_REMARKS,
+  REJECT_REMARKS,
   RESOLUTION_TEXT,
+  SECOND_CYCLE_TEXT,
   SHORTFALL_TEXT,
   STREETS,
   SURNAMES,
@@ -19,6 +22,9 @@ import {
 
 import { createApplication, saveStep, submitApplication } from '../../../src/server/services/applications';
 import { uploadDrawing } from '../../../src/server/services/drawings';
+import { updateBim, uploadBimFile } from '../../../src/server/services/bim';
+import { demoBimFor } from '../../../src/server/bim/demo-bim';
+import { loadBimSource } from './bim';
 import { requestScrutiny } from '../../../src/server/services/scrutiny';
 import { getDocuments, uploadDocument } from '../../../src/server/services/documents';
 import { generateFee } from '../../../src/server/services/fees';
@@ -375,6 +381,30 @@ export async function buildApplication(
     );
     drawingIds.push(result.drawingId);
   }
+
+  // ── BIM ────────────────────────────────────────────────────────────────
+  //
+  // The federated IFC model goes up with the drawings, through the real BIM
+  // service, and the LTP states the particulars and declares it. A file that
+  // will fail scrutiny carries a model whose built-up area runs over — the
+  // disagreement the BIM tab's reconciliation exists to show.
+  const bimSource = await loadBimSource(ctx.prisma, id);
+  if (bimSource) {
+    const demo = demoBimFor({ ...bimSource, status: spec.stop === 'SCRUTINY_FAILED' ? 'SCRUTINY_FAILED' : bimSource.status });
+    await uploadBimFile(
+      ltp,
+      {
+        applicationId: id,
+        kind: 'IFC_MODEL',
+        discipline: 'FEDERATED',
+        title: `${bimSource.applicationNumber} — federated model`,
+        remarks: 'Federated model, exported with the drawings.',
+        file: { name: demo.fileName, type: 'application/octet-stream', bytes: Buffer.from(demo.ifcText, 'utf8') },
+      },
+      META
+    );
+    await updateBim(ltp, id, { ...demo.particulars, declare: true }, META);
+  }
   await ctx.drainJobs();
 
   if (spec.stop === 'DRAWING_UPLOADED') return done();
@@ -537,12 +567,11 @@ async function departmental(
   const { rng } = ctx;
   const zoneId = spec.zone.id;
 
+  // BBAS_STANDARD: TPA → Planning Officer → ZDD → ZJD, and the ZJD decides.
   const tpa = ctx.officerFor(['TPA'], zoneId);
-  const zonal = ctx.officerFor(['ZAD', 'ZDD'], zoneId);
+  const po = ctx.officerFor(['PLANNING_OFFICER'], zoneId);
+  const zdd = ctx.officerFor(['ZDD'], zoneId);
   const zjd = ctx.officerFor(['ZJD'], zoneId);
-  const director = ctx.officerFor(['DIRECTOR_DP'], zoneId);
-  const addl = ctx.officerFor(['ADDL_COMMISSIONER'], zoneId);
-  const commissioner = ctx.officerFor(['COMMISSIONER'], zoneId);
 
   const act = (actor: Actor, action: string, input: Record<string, unknown> = {}) =>
     performAction(actor, id, action, { remarks: rng.pick(FORWARD_REMARKS), ...input }, META);
@@ -567,12 +596,22 @@ async function departmental(
   const shortfallInput = (kind: keyof typeof SHORTFALL_TEXT) => {
     const text = rng.pick(SHORTFALL_TEXT[kind]);
 
+    // Every item carries its category, its own required action and the
+    // document it asks for — the columns the register and the letter print.
+    // A FEE item also carries the amount, without which `raiseShortfall`
+    // refuses the shortfall outright.
     const items =
-      kind === 'FEE'
-        ? [{ description: text.title, amount: rng.int(4, 60) * 500 }]
-        : kind === 'CLARIFICATION'
-          ? []
-          : [{ description: text.action }];
+      kind === 'CLARIFICATION'
+        ? []
+        : text.items.map((item) => ({
+            description: item.description,
+            category: item.category,
+            requiredAction: item.action,
+            requiredDocument: item.document,
+            remarks: item.remarks ?? '',
+            isMandatory: !item.optional,
+            ...(kind === 'FEE' ? { amount: rng.int(4, 60) * 500 } : {}),
+          }));
 
     return {
       remarks: text.description,
@@ -584,6 +623,77 @@ async function departmental(
         items,
       },
     };
+  };
+
+  /**
+   * The open shortfall on this file, with its item ids — so a seeded response
+   * can answer it line by line the way the screen does.
+   */
+  const openShortfall = async () =>
+    ctx.prisma.shortfall.findFirst({
+      where: { applicationId: id, status: { notIn: ['RESOLVED', 'CANCELLED'] } },
+      orderBy: { raisedAt: 'desc' },
+      select: { id: true, items: { orderBy: { displayOrder: 'asc' }, select: { id: true } } },
+    });
+
+  /**
+   * The applicant's answer, itemised.
+   *
+   * `skipLast` leaves the final item unanswered, which is what produces a
+   * response an officer has a reason to send back — the case the second cycle
+   * exists to show.
+   */
+  const respondItemised = async (remarks: string, options: { skipLast?: boolean } = {}) => {
+    const shortfall = await openShortfall();
+    const itemIds = (shortfall?.items ?? []).map((item) => item.id);
+    const answered = options.skipLast ? itemIds.slice(0, Math.max(1, itemIds.length - 1)) : itemIds;
+
+    await act(spec.ltp, ACTIONS.RESUBMIT, {
+      remarks,
+      shortfallItems: answered.map((itemId) => ({
+        itemId,
+        response: rng.pick(ITEM_RESPONSE_TEXT),
+        applicantRemarks: '',
+        attachments: [],
+      })),
+    });
+  };
+
+  /**
+   * The officer sends it back, naming the item that is still wrong.
+   *
+   * This is what opens cycle 2: the shortfall stays open, the file returns to
+   * the applicant, and both attempts remain on the record.
+   */
+  const rejectItemised = async (actor: Actor) => {
+    const shortfall = await openShortfall();
+    const itemIds = (shortfall?.items ?? []).map((item) => item.id);
+
+    await act(actor, ACTIONS.REJECT_RESOLUTION, {
+      remarks: rng.pick(REJECT_REMARKS),
+      shortfallDecisions: itemIds.map((itemId, index) => ({
+        itemId,
+        // The last item is the one that fails. Every other line is accepted,
+        // so the applicant is sent back over ONE item and not over all of them.
+        decision: index === itemIds.length - 1 ? ('REJECTED' as const) : ('ACCEPTED' as const),
+        remarks: index === itemIds.length - 1 ? 'Still not answered on this item.' : '',
+      })),
+    });
+  };
+
+  /** Accepts whatever is open, itemised, and settles the shortfall. */
+  const acceptItemised = async (actor: Actor) => {
+    const shortfall = await openShortfall();
+    const itemIds = (shortfall?.items ?? []).map((item) => item.id);
+
+    await act(actor, ACTIONS.ACCEPT_RESOLUTION, {
+      remarks: rng.pick(ACCEPT_REMARKS),
+      shortfallDecisions: itemIds.map((itemId) => ({
+        itemId,
+        decision: 'ACCEPTED' as const,
+        remarks: '',
+      })),
+    });
   };
 
   switch (spec.stop) {
@@ -613,9 +723,9 @@ async function departmental(
       await claim(tpa);
       await act(tpa, ACTIONS.RAISE_DOCUMENT_SHORTFALL, shortfallInput('DOCUMENT'));
       await ctx.drainJobs();
-      await act(spec.ltp, ACTIONS.RESUBMIT, { remarks: rng.pick(RESOLUTION_TEXT) });
+      await respondItemised(rng.pick(RESOLUTION_TEXT));
       await ctx.drainJobs();
-      await act(tpa, ACTIONS.ACCEPT_RESOLUTION, { remarks: rng.pick(ACCEPT_REMARKS) });
+      await acceptItemised(tpa);
       await ctx.drainJobs();
       return done();
 
@@ -623,7 +733,49 @@ async function departmental(
       await claim(tpa);
       await act(tpa, ACTIONS.RAISE_DOCUMENT_SHORTFALL, shortfallInput('DOCUMENT'));
       await ctx.drainJobs();
-      await act(spec.ltp, ACTIONS.RESUBMIT, { remarks: rng.pick(RESOLUTION_TEXT) });
+      await respondItemised(rng.pick(RESOLUTION_TEXT));
+      await ctx.drainJobs();
+      return done();
+
+    // ── The second cycle ──────────────────────────────────────────────────
+    //
+    // Raise, answer all but one item, send it back naming that item, and the
+    // file is with the applicant AGAIN on the same shortfall. `attemptNo` 2 is
+    // appended; attempt 1 is untouched.
+
+    case 'TPA_SHORTFALL_CYCLE_2':
+      await claim(tpa);
+      await act(tpa, ACTIONS.RAISE_DOCUMENT_SHORTFALL, shortfallInput('DOCUMENT'));
+      await ctx.drainJobs();
+      await respondItemised(rng.pick(RESOLUTION_TEXT), { skipLast: true });
+      await ctx.drainJobs();
+      await rejectItemised(tpa);
+      await ctx.drainJobs();
+      return done();
+
+    case 'TPA_SHORTFALL_CYCLE_2_RESPONDED':
+      await claim(tpa);
+      await act(tpa, ACTIONS.RAISE_DOCUMENT_SHORTFALL, shortfallInput('DOCUMENT'));
+      await ctx.drainJobs();
+      await respondItemised(rng.pick(RESOLUTION_TEXT), { skipLast: true });
+      await ctx.drainJobs();
+      await rejectItemised(tpa);
+      await ctx.drainJobs();
+      await respondItemised(rng.pick(SECOND_CYCLE_TEXT));
+      await ctx.drainJobs();
+      return done();
+
+    case 'TPA_SHORTFALL_CYCLE_2_RESOLVED':
+      await claim(tpa);
+      await act(tpa, ACTIONS.RAISE_DOCUMENT_SHORTFALL, shortfallInput('DOCUMENT'));
+      await ctx.drainJobs();
+      await respondItemised(rng.pick(RESOLUTION_TEXT), { skipLast: true });
+      await ctx.drainJobs();
+      await rejectItemised(tpa);
+      await ctx.drainJobs();
+      await respondItemised(rng.pick(SECOND_CYCLE_TEXT));
+      await ctx.drainJobs();
+      await acceptItemised(tpa);
       await ctx.drainJobs();
       return done();
 
@@ -638,9 +790,22 @@ async function departmental(
     await claim(tpa);
     await act(tpa, ACTIONS.RAISE_DOCUMENT_SHORTFALL, shortfallInput('DOCUMENT'));
     await ctx.drainJobs();
-    await act(spec.ltp, ACTIONS.RESUBMIT, { remarks: rng.pick(RESOLUTION_TEXT) });
+
+    // A third of those go round twice before they are accepted, so files that
+    // have moved PAST the TPA still carry a two-cycle history behind them —
+    // the register's Cycle column is not a column that only ever reads 1.
+    if (rng.chance(0.33)) {
+      await respondItemised(rng.pick(RESOLUTION_TEXT), { skipLast: true });
+      await ctx.drainJobs();
+      await rejectItemised(tpa);
+      await ctx.drainJobs();
+      await respondItemised(rng.pick(SECOND_CYCLE_TEXT));
+    } else {
+      await respondItemised(rng.pick(RESOLUTION_TEXT));
+    }
+
     await ctx.drainJobs();
-    await act(tpa, ACTIONS.ACCEPT_RESOLUTION, { remarks: rng.pick(ACCEPT_REMARKS) });
+    await acceptItemised(tpa);
   } else {
     await claim(tpa);
   }
@@ -648,49 +813,68 @@ async function departmental(
   await act(tpa, ACTIONS.FORWARD);
   await ctx.drainJobs();
 
+  // ── Planning Officer ──────────────────────────────────────────────────
   switch (spec.stop) {
-    case 'ZAD_UNCLAIMED':
+    case 'PO_UNCLAIMED':
       return done();
-    case 'ZAD_CLAIMED':
-      await claim(zonal);
+    case 'PO_CLAIMED':
+      await claim(po);
       return done();
-    case 'ZAD_SHORTFALL':
-      await claim(zonal);
-      await act(zonal, ACTIONS.RAISE_DOCUMENT_SHORTFALL, shortfallInput('DOCUMENT'));
+    case 'PO_SHORTFALL':
+      await claim(po);
+      await act(po, ACTIONS.RAISE_DOCUMENT_SHORTFALL, shortfallInput('DOCUMENT'));
       await ctx.drainJobs();
       return done();
-    case 'ZAD_REVIEWING':
-      await claim(zonal);
-      await act(zonal, ACTIONS.RAISE_DOCUMENT_SHORTFALL, shortfallInput('DOCUMENT'));
+    case 'PO_REVIEWING':
+      await claim(po);
+      await act(po, ACTIONS.RAISE_DOCUMENT_SHORTFALL, shortfallInput('DOCUMENT'));
       await ctx.drainJobs();
-      await act(spec.ltp, ACTIONS.RESUBMIT, { remarks: rng.pick(RESOLUTION_TEXT) });
+      await respondItemised(rng.pick(RESOLUTION_TEXT));
       await ctx.drainJobs();
-      await act(zonal, ACTIONS.ACCEPT_RESOLUTION, { remarks: rng.pick(ACCEPT_REMARKS) });
+      await acceptItemised(po);
       await ctx.drainJobs();
       return done();
     default:
       break;
   }
 
-  await claim(zonal);
-  await act(zonal, ACTIONS.FORWARD);
+  await claim(po);
+  await act(po, ACTIONS.FORWARD);
   await ctx.drainJobs();
 
+  // ── ZDD ───────────────────────────────────────────────────────────────
+  switch (spec.stop) {
+    case 'ZDD_UNCLAIMED':
+      if (rng.chance(0.5)) await claim(zdd);
+      return done();
+    case 'ZDD_FEE_SHORTFALL':
+      await claim(zdd);
+      await act(zdd, ACTIONS.RAISE_FEE_SHORTFALL, shortfallInput('FEE'));
+      await ctx.drainJobs();
+      return done();
+    case 'ZJD_WITH_REPORTED_DOC':
+      // Reported, not blocking: the ZDD records the gap and sends the file on.
+      // It reaches the ZJD still open and blocks approval there until closed.
+      await claim(zdd);
+      await act(zdd, ACTIONS.REPORT_SHORTFALL_AND_FORWARD, shortfallInput('DOCUMENT'));
+      await ctx.drainJobs();
+      return done();
+    default:
+      break;
+  }
+
+  await claim(zdd);
+  await act(zdd, ACTIONS.FORWARD);
+  await ctx.drainJobs();
+
+  // ── ZJD: the apex desk ────────────────────────────────────────────────
   switch (spec.stop) {
     case 'ZJD_UNCLAIMED':
-      if (rng.chance(0.5)) await claim(zjd);
+      if (rng.chance(0.4)) await claim(zjd);
       return done();
     case 'ZJD_FEE_SHORTFALL':
       await claim(zjd);
       await act(zjd, ACTIONS.RAISE_FEE_SHORTFALL, shortfallInput('FEE'));
-      await ctx.drainJobs();
-      return done();
-    case 'DIRECTOR_WITH_REPORTED_FEE':
-      // Reported, not blocking: the ZJD records the shortage and sends the
-      // file on anyway. It travels to the Director's desk still open — and it
-      // will block approval there until somebody closes it.
-      await claim(zjd);
-      await act(zjd, ACTIONS.REPORT_FEE_SHORTFALL_AND_FORWARD, shortfallInput('FEE'));
       await ctx.drainJobs();
       return done();
     default:
@@ -698,44 +882,9 @@ async function departmental(
   }
 
   await claim(zjd);
-  await act(zjd, ACTIONS.FORWARD);
-  await ctx.drainJobs();
-
-  switch (spec.stop) {
-    case 'DIRECTOR_UNCLAIMED':
-      if (rng.chance(0.5)) await claim(director);
-      return done();
-    case 'ADDL_COMMISSIONER_WITH_REPORTED_DOC':
-      await claim(director);
-      await act(director, ACTIONS.REPORT_SHORTFALL_AND_FORWARD, shortfallInput('DOCUMENT'));
-      await ctx.drainJobs();
-      return done();
-    default:
-      break;
-  }
-
-  await claim(director);
-  await act(director, ACTIONS.FORWARD);
-  await ctx.drainJobs();
-
-  if (spec.stop === 'ADDL_COMMISSIONER_UNCLAIMED') {
-    if (rng.chance(0.5)) await claim(addl);
-    return done();
-  }
-
-  await claim(addl);
-  await act(addl, ACTIONS.FORWARD);
-  await ctx.drainJobs();
-
-  if (spec.stop === 'COMMISSIONER_UNCLAIMED') {
-    if (rng.chance(0.4)) await claim(commissioner);
-    return done();
-  }
-
-  await claim(commissioner);
 
   if (spec.stop === 'REJECTED') {
-    await act(commissioner, ACTIONS.REJECT, { remarks: rng.pick(REJECTION_REMARKS) });
+    await act(zjd, ACTIONS.REJECT, { remarks: rng.pick(REJECTION_REMARKS) });
     await ctx.drainJobs();
     return done();
   }
@@ -743,7 +892,7 @@ async function departmental(
   // APPROVE runs the `no_open_shortfalls` guard with no override. If any of
   // the cycles above left one open, this throws — which is the seed telling
   // the truth rather than papering over it.
-  await act(commissioner, ACTIONS.APPROVE, { remarks: rng.pick(APPROVAL_REMARKS) });
+  await act(zjd, ACTIONS.APPROVE, { remarks: rng.pick(APPROVAL_REMARKS) });
   await ctx.drainJobs();
   return done();
 }

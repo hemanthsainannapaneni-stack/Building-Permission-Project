@@ -72,6 +72,7 @@ export async function dispatchEvent(event: {
 
   if (!isKnownEvent(event.eventCode) && !isKnownEvent(canonicalCode)) {
     await logRow({
+      applicationId: event.applicationId,
       eventCode: event.eventCode,
       channel: 'IN_APP',
       recipient: '',
@@ -95,6 +96,7 @@ export async function dispatchEvent(event: {
 
   if (!recipients.length) {
     await logRow({
+      applicationId: event.applicationId,
       eventCode: event.eventCode,
       channel: 'IN_APP',
       recipient: '',
@@ -121,6 +123,7 @@ export async function dispatchEvent(event: {
       const decision = await shouldSend(canonicalCode, channel, recipient, quiet);
       if (decision) {
         await logRow({
+          applicationId: event.applicationId,
           eventCode: event.eventCode,
           channel,
           templateId: template.id.startsWith('fallback-') ? null : template.id,
@@ -192,6 +195,7 @@ export async function dispatchEvent(event: {
       }
 
       await logRow({
+        applicationId: event.applicationId,
         eventCode: event.eventCode,
         channel,
         templateId: template.id.startsWith('fallback-') ? null : template.id,
@@ -323,6 +327,7 @@ type LogInput = {
   providerRef?: string;
   error?: string;
   sentAt?: Date | null;
+  applicationId?: string | null;
 };
 
 async function logRow(row: LogInput) {
@@ -332,6 +337,7 @@ async function logRow(row: LogInput) {
         eventCode: row.eventCode,
         channel: row.channel,
         templateId: row.templateId ?? null,
+        applicationId: row.applicationId ?? null,
         recipientUserId: row.recipientUserId ?? null,
         recipient: row.recipient || (row.recipientUserId ? `user:${row.recipientUserId}` : 'unknown'),
         subject: row.subject ?? '',

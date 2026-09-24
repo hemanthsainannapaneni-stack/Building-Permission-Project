@@ -82,6 +82,10 @@ export const RATE_LIMITS = {
   login: { limit: 5, windowSeconds: 15 * 60 },
   forgotPassword: { limit: 3, windowSeconds: 60 * 60 },
   upload: { limit: 20, windowSeconds: 60 * 60 },
+  // A site visit produces a dozen photographs at a sitting, and an inspector
+  // may visit several sites in a day — the document-upload ceiling would stop
+  // them half way round the second plot.
+  inspectionPhoto: { limit: 120, windowSeconds: 60 * 60 },
   paymentInitiate: { limit: 10, windowSeconds: 60 * 60 },
   webhook: { limit: 100, windowSeconds: 60 },
   publicVerify: { limit: 30, windowSeconds: 60 },

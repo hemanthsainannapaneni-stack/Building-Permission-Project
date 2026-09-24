@@ -365,3 +365,88 @@ export async function sweepSla(now: Date = new Date()): Promise<SlaSweepReport> 
 
   return report;
 }
+
+// ── Describing a clock, for a screen ─────────────────────────────────────
+
+export type SlaClock = {
+  /** When this desk received the file and the clock started. */
+  startedAt: Date;
+  /** The standard, in days, and the calendar it counts in. */
+  targetDays: number | null;
+  calendar: string;
+  dueAt: Date;
+  /** Whole days the desk has actually held it — parked time excluded. */
+  elapsedDays: number;
+  /** Working days left. Negative once the date has passed. */
+  remainingDays: number;
+  status: string;
+  /** How far through the standard, 0–100. Caps at 100; it never reads 140%. */
+  percent: number;
+  isPaused: boolean;
+  isDueSoon: boolean;
+  isOverdue: boolean;
+  overdueDays: number;
+  /**
+   * The role told when this clock goes overdue, if any.
+   *
+   * Present so a screen can SAY who was told. Escalation here is one
+   * notification to one role and nothing else — no reassignment, no automatic
+   * action, and above all no deemed approval (docs R.1.1).
+   */
+  escalatesTo: string | null;
+};
+
+/**
+ * Turns a stored clock into the numbers a panel shows.
+ *
+ * ── Elapsed excludes parked time, and that is the point ─────────────────
+ *
+ * `pausedMs` accumulates the time a blocking shortfall had the file with the
+ * applicant. Counting it would make the figure a measure of how slow
+ * applicants are, which is exactly the number a department does not need. So
+ * "12 days at this desk" means twelve days this desk could have acted.
+ *
+ * Pure: it reads a row and computes, and writes nothing. `sweep()` remains the
+ * only thing that changes a clock's status.
+ */
+export function describeSlaClock(
+  sla: {
+    startedAt: Date;
+    dueAt: Date;
+    status: string;
+    pausedAt: Date | null;
+    pausedMs: number;
+    overdueDays: number;
+    rule?: { days: number; calendar: string; escalateToRoleKey: string | null } | null;
+  },
+  now: Date = new Date()
+): SlaClock {
+  // A paused clock froze when it was paused. Measuring to `now` would keep
+  // counting the applicant's time against the desk, which is the whole thing
+  // pausing exists to prevent.
+  const effectiveNow = sla.pausedAt ?? now;
+  const heldMs = Math.max(0, effectiveNow.getTime() - sla.startedAt.getTime() - sla.pausedMs);
+
+  const elapsedDays = Math.floor(heldMs / DAY_MS);
+  const remainingMs = sla.dueAt.getTime() - effectiveNow.getTime();
+  const remainingDays = Math.ceil(remainingMs / DAY_MS);
+
+  const spanMs = sla.dueAt.getTime() - sla.startedAt.getTime() - sla.pausedMs;
+  const percent = spanMs > 0 ? Math.max(0, Math.min(100, Math.round((heldMs / spanMs) * 100))) : 100;
+
+  return {
+    startedAt: sla.startedAt,
+    targetDays: sla.rule?.days ?? null,
+    calendar: sla.rule?.calendar ?? 'WORKING_DAYS',
+    dueAt: sla.dueAt,
+    elapsedDays,
+    remainingDays,
+    status: sla.status,
+    percent,
+    isPaused: sla.pausedAt != null || sla.status === 'PAUSED',
+    isDueSoon: sla.status === 'DUE_SOON',
+    isOverdue: sla.status === 'OVERDUE',
+    overdueDays: sla.overdueDays,
+    escalatesTo: sla.rule?.escalateToRoleKey ?? null,
+  };
+}

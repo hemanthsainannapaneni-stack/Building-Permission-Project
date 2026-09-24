@@ -57,7 +57,7 @@ function SlaDialog({ open, onClose, onSaved, editing, stages, appTypes }: {
   open: boolean; onClose: () => void; onSaved: () => void;
   editing: SlaRuleRow | null; stages: SlaStage[]; appTypes: SlaAppType[];
 }) {
-  const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting }, reset } = useForm({ resolver: zodResolver(schema) });
+  const { register, handleSubmit, setValue, formState: { errors, isSubmitting }, reset } = useForm({ resolver: zodResolver(schema) });
   React.useEffect(() => {
     if (open) reset(editing
       ? { workflowStageId: editing.workflowStageId, applicationTypeId: editing.applicationTypeId ?? '', days: editing.days, calendar: editing.calendar, warnAtPercent: editing.warnAtPercent, escalateToRoleKey: editing.escalateToRoleKey ?? '', pauseOnShortfall: editing.pauseOnShortfall }

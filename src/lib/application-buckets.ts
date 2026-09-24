@@ -42,15 +42,33 @@ export type BucketDef = {
   hint: string;
 };
 
-/** Every status where the file is sitting with the department, not the LTP. */
-const UNDER_REVIEW: StatusName[] = [
+/**
+ * Every status where the file is sitting with the department, not the LTP.
+ *
+ * Covers BOTH chains. A status belonging to a desk that only BP_STANDARD has
+ * is still listed, because files decided under that chain carry it for ever
+ * and a register that stopped counting them would be wrong about the past.
+ */
+export const UNDER_REVIEW: StatusName[] = [
   'SUBMITTED',
+
   'PENDING_TPA',
   'TPA_REVIEW',
-  'PENDING_ZAD_ZDD',
-  'ZAD_ZDD_REVIEW',
+
+  // BBAS_STANDARD
+  'SITE_INSPECTION_SCHEDULED',
+  'SITE_INSPECTION_IN_PROGRESS',
+  'PENDING_PLANNING_OFFICER',
+  'PLANNING_OFFICER_REVIEW',
+  'PENDING_ZDD',
+  'ZDD_REVIEW',
+
   'PENDING_ZJD',
   'ZJD_REVIEW',
+
+  // BP_STANDARD
+  'PENDING_ZAD_ZDD',
+  'ZAD_ZDD_REVIEW',
   'PENDING_DIRECTOR_DP',
   'DIRECTOR_REVIEW',
   'PENDING_ADDITIONAL_COMMISSIONER',
@@ -70,16 +88,27 @@ const UNDER_REVIEW: StatusName[] = [
  * already reads the bucket rather than its own predicate, so that is a change
  * to this file alone.
  */
-const SHORTFALL: StatusName[] = [
+export const SHORTFALL: StatusName[] = [
+  // No desk named — the fallback a stage without its own parked status uses.
+  'RETURNED_TO_APPLICANT',
+
   'TPA_DOCUMENT_SHORTFALL',
   'TPA_FEE_SHORTFALL',
   'TPA_TECHNICAL_SHORTFALL',
-  'ZAD_ZDD_SHORTFALL',
+
+  // BBAS_STANDARD
+  'PLANNING_OFFICER_SHORTFALL',
+  'ZDD_SHORTFALL',
+
   'ZJD_SHORTFALL',
   'ZJD_FEE_SHORTFALL',
+
+  // BP_STANDARD
+  'ZAD_ZDD_SHORTFALL',
   'DIRECTOR_SHORTFALL',
   'DIRECTOR_REPORTED_SHORTFALL',
   'ADDITIONAL_COMMISSIONER_SHORTFALL',
+  'COMMISSIONER_SHORTFALL',
 ];
 
 export const BUCKETS: readonly BucketDef[] = [

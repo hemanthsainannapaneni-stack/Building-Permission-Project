@@ -22,9 +22,27 @@ import { prisma, type Db } from '@/server/db/prisma';
  * retry count an administrator can see.
  */
 
-/** The 22 events from docs/07-subsystems.md M.2. */
+/**
+ * The event vocabulary.
+ *
+ * ── Some of these have no producer yet, and that is deliberate ──────────
+ *
+ * INSPECTION_DUE, WORK_INITIATED and OCCUPANCY_SUBMITTED belong to modules
+ * that have not been built. They are declared here, given recipient rules and
+ * given templates, because the alternative is that whoever builds Site
+ * Inspection also invents an event name, a recipient rule and three templates
+ * at the same time — and invents them differently from whoever builds
+ * Occupancy. The vocabulary is the cheap half of the contract and the half
+ * that is worth fixing first.
+ *
+ * `scripts/verify-demo.ts` asserts that every event here HAS a template, and
+ * separately reports which have never been emitted, so an event that stays
+ * unproduced is visible rather than forgotten.
+ */
 export const EVENTS = {
   APPLICATION_CREATED: 'APPLICATION_CREATED',
+  /** The file leaves the applicant's hands. Distinct from CREATED, which is a draft. */
+  APPLICATION_SUBMITTED: 'APPLICATION_SUBMITTED',
   DRAWING_UPLOADED: 'DRAWING_UPLOADED',
   SCRUTINY_PASSED: 'SCRUTINY_PASSED',
   SCRUTINY_FAILED: 'SCRUTINY_FAILED',
@@ -35,6 +53,12 @@ export const EVENTS = {
   PAYMENT_FAILED: 'PAYMENT_FAILED',
   APPLICATION_FORWARDED: 'APPLICATION_FORWARDED',
   TASK_ASSIGNED: 'TASK_ASSIGNED',
+  /** A named officer now holds this file. TASK_ASSIGNED is the queue; this is the person. */
+  APPLICATION_ASSIGNED: 'APPLICATION_ASSIGNED',
+  /** A file has arrived at a reviewing desk and is waiting to be looked at. */
+  REVIEW_REQUIRED: 'REVIEW_REQUIRED',
+  /** A file has reached the desk that can approve it. */
+  APPROVAL_REQUIRED: 'APPROVAL_REQUIRED',
   SHORTFALL_RAISED: 'SHORTFALL_RAISED',
   SHORTFALL_RESPONDED: 'SHORTFALL_RESPONDED',
   SHORTFALL_RESOLVED: 'SHORTFALL_RESOLVED',
@@ -46,6 +70,26 @@ export const EVENTS = {
   SLA_DUE_SOON: 'SLA_DUE_SOON',
   SLA_OVERDUE: 'SLA_OVERDUE',
   ORDER_ISSUED: 'ORDER_ISSUED',
+
+  // ── Declared, not yet produced ────────────────────────────────────────
+  //
+  // No code emits these. They belong to Site Inspection, Commencement and
+  // Occupancy, which are later phases. Declaring the name, the recipients and
+  // the templates now is what stops three different modules inventing three
+  // different spellings of the same message later.
+  /** A site inspection is scheduled and falling due. */
+  INSPECTION_DUE: 'INSPECTION_DUE',
+  /**
+   * The applicant has declared that work on site has started. Produced since
+   * Phase 9 by the NOTIFY_WORK_COMMENCEMENT transition's `notify`.
+   */
+  WORK_INITIATED: 'WORK_INITIATED',
+  /**
+   * An occupancy certificate application has been filed. Produced since
+   * Phase 10 by the SUBMIT_OCCUPANCY transition's `notify`.
+   */
+  OCCUPANCY_SUBMITTED: 'OCCUPANCY_SUBMITTED',
+
   USER_CREATED: 'USER_CREATED',
   PASSWORD_RESET: 'PASSWORD_RESET',
 } as const;

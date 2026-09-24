@@ -13,79 +13,85 @@ import {
 import { toast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
 
-const PERSONAS = [
-  {
-    name: 'Super Administrator',
-    role: 'Super Admin',
-    email: 'admin.demo@example.com',
-    desc: 'Full system oversight & configuration',
-    badge: 'Admin',
-    color: 'text-purple-600 bg-purple-50 border-purple-200',
-  },
-  {
-    name: 'Ravi Kumar (LTP)',
-    role: 'Licensed Architect',
-    email: 'ltp.demo@example.com',
-    desc: 'Submit plans, upload drawings, pay fees',
-    badge: 'Applicant',
-    color: 'text-blue-600 bg-blue-50 border-blue-200',
-  },
-  {
-    name: 'P. Venkat Rao (TPA)',
-    role: 'Town Planning Assistant',
-    email: 'tpa.demo@example.com',
-    desc: 'Scrutiny verification & fee demands',
-    badge: 'Department',
-    color: 'text-emerald-600 bg-emerald-50 border-emerald-200',
-  },
-  {
-    name: 'K. Ramesh Babu (ZAD)',
-    role: 'Zonal Assistant Director',
-    email: 'zad.demo@example.com',
-    desc: 'Technical inspection & desk approvals',
-    badge: 'Department',
-    color: 'text-amber-600 bg-amber-50 border-amber-200',
-  },
-  {
-    name: 'S. Vijay Kumar (ZJD)',
-    role: 'Zonal Joint Director',
-    email: 'zjd.demo@example.com',
-    desc: 'Intermediate planning sanction',
-    badge: 'Department',
-    color: 'text-amber-700 bg-amber-50 border-amber-200',
-  },
-  {
-    name: 'Smt. M. Padmavathi IAS',
-    role: 'Commissioner',
-    email: 'commissioner.demo@example.com',
-    desc: 'Final statutory sanction order issuance',
-    badge: 'Executive',
-    color: 'text-rose-600 bg-rose-50 border-rose-200',
-  },
-];
+/**
+ * Switch Desk.
+ *
+ * The list used to be a hard-coded array of six people in this file — names,
+ * emails, descriptions and the demo password, all string literals in the
+ * client bundle. It had drifted from the product: it offered a Commissioner
+ * and no ZDD, and no Planning Officer at all, which is the wrong shape for the
+ * chain the system now runs.
+ *
+ * It now comes from `/api/auth/desks`, which reads the accounts the seed
+ * actually created and returns them in the order the approval chain visits
+ * them. Adding a desk is a seed change; this file does not know the names of
+ * any role.
+ *
+ * Switching SIGNS IN as that account, through the ordinary sign-in route. It
+ * does not impersonate and it does not widen anything: the session that
+ * results carries exactly the capabilities that account holds. Outside
+ * DEMO_MODE the endpoint returns nothing and this control renders nothing.
+ */
+
+type Desk = {
+  email: string;
+  name: string;
+  roleKey: string;
+  roleName: string;
+  designation: string;
+  purpose: string;
+  group: string;
+  zones: string[];
+};
+
+/** Group → the tone its initial badge is painted in. */
+const GROUP_TONE: Record<string, string> = {
+  Applicant: 'text-blue-600 bg-blue-50 border-blue-200',
+  Department: 'text-emerald-600 bg-emerald-50 border-emerald-200',
+  Administration: 'text-purple-600 bg-purple-50 border-purple-200',
+};
 
 export function QuickPersonaSwitcher({ currentEmail }: { currentEmail: string }) {
+  const [desks, setDesks] = React.useState<Desk[] | null>(null);
+  const [password, setPassword] = React.useState<string | null>(null);
   const [switchingTo, setSwitchingTo] = React.useState<string | null>(null);
 
-  async function switchPersona(email: string) {
-    if (email === currentEmail || switchingTo) return;
+  // Fetched once, on mount. The list changes only when the seed runs.
+  React.useEffect(() => {
+    let cancelled = false;
+
+    fetch('/api/auth/desks')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body) => {
+        if (cancelled || !body) return;
+        const data = (body.data ?? body) as { desks?: Desk[]; password?: string | null };
+        setDesks(data.desks ?? []);
+        setPassword(data.password ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setDesks([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function switchDesk(email: string) {
+    if (email === currentEmail || switchingTo || !password) return;
     setSwitchingTo(email);
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password: 'Demo@12345' }),
+        body: JSON.stringify({ email, password }),
       });
 
-      if (!res.ok) {
-        throw new Error('Failed to switch persona');
-      }
+      if (!res.ok) throw new Error('Failed to switch desk');
 
-      toast.success('Switched desk', {
-        description: `Now active on ${email}`,
-      });
+      toast.success('Switched desk', { description: `Now active on ${email}` });
 
-      // Reload to ensure all server layouts and session caches refresh
+      // Reload so every server layout and session cache is rebuilt.
       window.location.href = '/dashboard';
     } catch {
       setSwitchingTo(null);
@@ -95,7 +101,10 @@ export function QuickPersonaSwitcher({ currentEmail }: { currentEmail: string })
     }
   }
 
-  const activePersona = PERSONAS.find((p) => p.email === currentEmail);
+  // Nothing to switch to — DEMO_MODE is off, or the list has not arrived yet.
+  if (!desks?.length) return null;
+
+  const active = desks.find((d) => d.email === currentEmail);
 
   return (
     <DropdownMenu>
@@ -114,7 +123,7 @@ export function QuickPersonaSwitcher({ currentEmail }: { currentEmail: string })
             <Sparkles className="size-3.5 text-primary" />
           )}
           <span className="hidden sm:inline font-semibold">
-            {activePersona ? activePersona.role : 'Switch Desk'}
+            {active ? active.roleName : 'Switch Desk'}
           </span>
           <ChevronDown className="size-3 opacity-70" />
         </button>
@@ -134,17 +143,17 @@ export function QuickPersonaSwitcher({ currentEmail }: { currentEmail: string })
         <DropdownMenuSeparator className="my-1.5" />
 
         <div className="space-y-1">
-          {PERSONAS.map((persona) => {
-            const isCurrent = persona.email === currentEmail;
-            const isSwitching = switchingTo === persona.email;
+          {desks.map((desk) => {
+            const isCurrent = desk.email === currentEmail;
+            const isSwitching = switchingTo === desk.email;
 
             return (
               <DropdownMenuItem
-                key={persona.email}
+                key={desk.email}
                 disabled={isCurrent || Boolean(switchingTo)}
                 onSelect={(e) => {
                   e.preventDefault();
-                  void switchPersona(persona.email);
+                  void switchDesk(desk.email);
                 }}
                 className={cn(
                   'flex items-start gap-2.5 rounded-lg p-2 transition-colors cursor-pointer',
@@ -154,7 +163,7 @@ export function QuickPersonaSwitcher({ currentEmail }: { currentEmail: string })
                 <div
                   className={cn(
                     'mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg border text-caption font-bold',
-                    persona.color
+                    GROUP_TONE[desk.group] ?? 'text-slate-600 bg-slate-50 border-slate-200'
                   )}
                 >
                   {isSwitching ? (
@@ -162,21 +171,23 @@ export function QuickPersonaSwitcher({ currentEmail }: { currentEmail: string })
                   ) : isCurrent ? (
                     <Check className="size-3.5 text-primary" />
                   ) : (
-                    persona.badge.charAt(0)
+                    desk.group.charAt(0)
                   )}
                 </div>
 
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-1">
                     <p className="truncate text-small font-semibold text-text leading-tight">
-                      {persona.name}
+                      {desk.name}
+                      <span className="font-normal text-text-muted"> · {desk.roleName}</span>
                     </p>
                     <span className="shrink-0 rounded-full bg-surface-sunk px-1.5 py-0.2 text-[10px] font-medium text-text-muted">
-                      {persona.badge}
+                      {desk.group}
                     </span>
                   </div>
                   <p className="text-caption text-text-muted leading-tight mt-0.5">
-                    {persona.desc}
+                    {desk.purpose}
+                    {desk.zones.length > 0 && ` · ${desk.zones.join(', ')}`}
                   </p>
                 </div>
               </DropdownMenuItem>

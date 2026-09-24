@@ -209,16 +209,13 @@ export function DonutChart({
  */
 export function BarList({
   rows,
-  href,
   emptyLabel = 'Nothing here yet.',
   className,
 }: {
   rows: Array<{ key: string; label: string; value: number; tone?: Tone; href?: string }>;
-  href?: (key: string) => string;
   emptyLabel?: string;
   className?: string;
 }) {
-  const max = Math.max(1, ...rows.map((r) => r.value));
   const shown = rows.filter((r) => r.value > 0);
 
   if (!shown.length) {

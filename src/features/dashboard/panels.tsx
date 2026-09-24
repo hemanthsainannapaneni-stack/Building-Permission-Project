@@ -20,6 +20,7 @@ export function Panel({
   title,
   description,
   action,
+  icon: Icon,
   children,
   className,
   bodyClassName,
@@ -27,6 +28,8 @@ export function Panel({
   title: string;
   description?: string;
   action?: { href: string; label: string };
+  /** A quiet glyph beside the title. Decoration, so it is hidden from readers. */
+  icon?: React.ComponentType<{ className?: string }>;
   children: React.ReactNode;
   className?: string;
   bodyClassName?: string;
@@ -35,7 +38,10 @@ export function Panel({
     <Card className={cn('font-inter', className)}>
       <CardHeader className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
         <div className="min-w-0">
-          <CardTitle className="text-small font-bold text-text">{title}</CardTitle>
+          <CardTitle className="flex items-center gap-1.5 text-small font-bold text-text">
+            {Icon && <Icon className="size-3.5 shrink-0 text-text-muted" aria-hidden="true" />}
+            {title}
+          </CardTitle>
           {description && <CardDescription className="text-caption text-text-muted mt-0.5">{description}</CardDescription>}
         </div>
         {action && (

@@ -27,6 +27,9 @@ const buttonVariants = cva(
         link: 'text-primary underline-offset-4 hover:underline p-0 h-auto',
       },
       size: {
+        // The compact control that sits inside a table row or a card header,
+        // where a `sm` button is already too tall for the line it shares.
+        xs: 'h-7 px-2 text-caption rounded-md [&_svg]:size-3.5',
         sm: 'h-8 px-3 text-small rounded-md',
         md: 'h-9 px-4 text-body rounded-lg',
         lg: 'h-10 px-5 text-body rounded-xl font-semibold',

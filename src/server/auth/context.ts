@@ -29,6 +29,7 @@ export type AuthUser = {
   zoneIds: string[];
   officeId: string | null;
   sessionId: string;
+  roleNames: string[];
 };
 
 /**
@@ -84,6 +85,7 @@ export const getAuthUser = cache(async function getAuthUser(): Promise<AuthUser 
     name: user.name,
     email: user.email,
     roleKeys,
+    roleNames: user.roles.map((r) => r.role.name),
     capabilities,
     zoneIds,
     officeId: user.officeId,

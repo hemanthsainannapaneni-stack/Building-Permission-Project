@@ -48,6 +48,16 @@ export const EVENT_TYPES = {
   FEE_GENERATED: 'FEE_GENERATED',
   FEE_CANCELLED: 'FEE_CANCELLED',
 
+  CHECKLIST_ANSWERED: 'CHECKLIST_ANSWERED',
+  CHECKLIST_REVIEWED: 'CHECKLIST_REVIEWED',
+  OTHERS_UPDATED: 'OTHERS_UPDATED',
+
+  // ── BIM ──
+  BIM_MODEL_UPLOADED: 'BIM_MODEL_UPLOADED',
+  BIM_UPDATED: 'BIM_UPDATED',
+  BIM_DECLARED: 'BIM_DECLARED',
+  BIM_REVIEWED: 'BIM_REVIEWED',
+
   // ── Reserved for later phases. Listed so the renderer already knows how to
   //    draw them, and so the vocabulary is agreed before it is used. ──
   PAYMENT_SUCCESSFUL: 'PAYMENT_SUCCESSFUL',

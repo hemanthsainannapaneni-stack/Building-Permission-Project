@@ -59,7 +59,7 @@ export interface StorageProvider {
  */
 export function buildStorageKey(parts: {
   applicationId: string;
-  kind: 'drawings' | 'documents' | 'reports' | 'orders' | 'receipts';
+  kind: 'drawings' | 'bim' | 'documents' | 'reports' | 'orders' | 'receipts' | 'inspections' | 'nocs' | 'proceedings' | 'commencements' | 'occupancy';
   random: string;
   extension: string;
 }): string {

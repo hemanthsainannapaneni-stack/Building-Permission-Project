@@ -1,22 +1,5 @@
 import Link from 'next/link';
-import {
-  FileText,
-  AlertTriangle,
-  CreditCard,
-  ClipboardCheck,
-  Clock,
-  CheckCircle2,
-  CircleX,
-  Users,
-  Shield,
-  Building2,
-  Database,
-  Layers,
-  Banknote,
-  Gauge,
-  ScrollText,
-  Landmark,
-} from 'lucide-react';
+import { AlertTriangle, ClipboardCheck, Clock, FileBadge2 } from 'lucide-react';
 import {
   Icon3DStack,
   Icon3DActivity,
@@ -31,7 +14,6 @@ import {
   Icon3DCircleDollar,
   Icon3DTrendingUp,
   Icon3DFileEdit,
-  Icon3DSparkles,
 } from '@/components/ui/icons-3d';
 import { KpiCard } from '@/components/common/kpi-card';
 import { Badge } from '@/components/ui/badge';
@@ -298,7 +280,7 @@ export function AdminDashboard({
   consolidated: ConsolidatedView;
   activity: ActivityEntry[];
 }) {
-  const { applications, finance, sla, shortfalls } = data;
+  const { applications, finance, sla, shortfalls, approvals } = data;
 
   return (
     <div className="space-y-3.5">
@@ -332,7 +314,7 @@ export function AdminDashboard({
 
           <div className="space-y-1.5">
             <SectionHeading title="Attention & SLA" />
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-5">
               <KpiCard
                 label="Open shortfalls"
                 value={shortfalls.open}
@@ -340,6 +322,14 @@ export function AdminDashboard({
                 hint={shortfalls.overdue ? `${shortfalls.overdue} overdue` : undefined}
                 icon={Icon3DAlertOctagon}
                 href="/shortfalls"
+              />
+              <KpiCard
+                label="NOCs pending"
+                value={data.nocs.pending}
+                tone="amber"
+                icon={Icon3DFileEdit}
+                hint={data.nocs.awaitingVerification ? `${data.nocs.awaitingVerification} awaiting verification` : 'Not yet verified'}
+                href="/nocs?status=OUTSTANDING"
               />
               <KpiCard
                 label="Overdue tasks"
@@ -360,6 +350,59 @@ export function AdminDashboard({
                 value={sla.averageDaysToClose === null ? '—' : `${sla.averageDaysToClose} d`}
                 tone="indigo"
                 icon={Icon3DGauge}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <SectionHeading title="Permissions & Notices" />
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+              <KpiCard
+                label="Approval pending"
+                value={approvals.approvalPending}
+                tone="amber"
+                icon={Icon3DFileEdit}
+                hint="At a desk that can approve"
+                href="/applications"
+              />
+              <KpiCard
+                label="BPO issued"
+                value={approvals.ordersIssued}
+                tone="emerald"
+                icon={Icon3DShieldCheck}
+                hint={
+                  approvals.ordersPending
+                    ? `${approvals.ordersPending} awaiting issue`
+                    : undefined
+                }
+                href="/applications?bucket=approved"
+              />
+              <KpiCard
+                label="SLA overdue"
+                value={sla.overdue}
+                tone="red"
+                icon={Icon3DHourglass}
+                hint={
+                  sla.applicationsOverdue
+                    ? `${sla.applicationsOverdue} applications affected`
+                    : undefined
+                }
+                href="/tasks?filter=overdue"
+              />
+              {/* Undispatched OUTBOX rows — people the system has decided
+                  something about and not yet told. Not unread inbox items,
+                  which measure whether users read their messages. */}
+              <KpiCard
+                label="Notifications pending"
+                value={approvals.notificationsPending}
+                tone={approvals.notificationsFailed ? 'rose' : 'blue'}
+                icon={Icon3DActivity}
+                hint={
+                  approvals.notificationsFailed
+                    ? `${approvals.notificationsFailed} have failed at least once`
+                    : undefined
+                }
+                href="/admin/settings/notifications"
               />
             </div>
           </div>
@@ -522,7 +565,7 @@ export function ExecutiveDashboard({
 
       <SectionHeading title="Department Overview" />
 
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-5">
         <KpiCard label="Total applications" value={applications.total} icon={Icon3DStack} href="/applications" />
         <KpiCard label="In progress" value={applications.inProgress} icon={Icon3DActivity} />
         <KpiCard
@@ -535,6 +578,13 @@ export function ExecutiveDashboard({
           label="Average time to decide"
           value={sla.averageDaysToClose === null ? '—' : `${sla.averageDaysToClose} d`}
           icon={Icon3DGauge}
+        />
+        <KpiCard
+          label="NOCs pending"
+          value={data.nocs.pending}
+          icon={Icon3DFileEdit}
+          hint={`${data.nocs.verified} verified`}
+          href="/nocs?status=OUTSTANDING"
         />
       </div>
 
@@ -644,7 +694,7 @@ export function OfficerDashboard({
     <div className="space-y-3.5">
       <SectionHeading title={`${roleLabel} Desk Queue`} />
 
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-5">
         <KpiCard label="At your desk" value={summary.total} icon={ClipboardCheck} href="/tasks" />
         <KpiCard
           label="Unclaimed"
@@ -660,6 +710,14 @@ export function OfficerDashboard({
           tone={summary.overdue ? 'danger' : 'neutral'}
           icon={AlertTriangle}
           href="/tasks?filter=overdue"
+        />
+        <KpiCard
+          label="NOCs pending"
+          value={data.nocs.pending}
+          tone={data.nocs.awaitingVerification ? 'info' : 'neutral'}
+          icon={FileBadge2}
+          hint={`${data.nocs.awaitingVerification} received, awaiting verification`}
+          href="/nocs?status=OUTSTANDING"
         />
       </div>
 

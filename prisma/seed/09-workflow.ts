@@ -1,227 +1,32 @@
 import type { PrismaClient } from '@prisma/client';
+import { buildWorkflow, type BuildResult } from './workflow/builder';
+import { BP_STANDARD } from './workflow/bp-standard';
+import { BBAS_STANDARD } from './workflow/bbas-standard';
 
 /**
- * THE WORKFLOW ITSELF.
+ * THE WORKFLOWS, AND WHICH ONE IS THE DEFAULT.
  *
- * Everything the department does with a file is in this one file, as data:
- * which desks exist, what each may do, where each action sends the file, what
- * must be true before it may, and what else happens when it does.
+ * Everything the department does with a file is data: which desks exist, what
+ * each may do, where each action sends the file, what must be true before it
+ * may, and what else happens when it does. `src/server/workflow/engine.ts`
+ * contains none of it. That is the deal the engine makes — it is a mechanism,
+ * and this is the policy.
  *
- * `src/server/workflow/engine.ts` contains none of it. That is the deal Phase 6
- * makes: the engine is a mechanism, and this is the policy. Granting the
- * Additional Commissioner the power to report a shortfall and forward is a row
- * below — not a branch, not a page, not a deployment.
+ * Two chains are seeded, and both are published:
  *
- * ── Where the engine's authority begins ──────────────────────────────────
+ *   BBAS_STANDARD   TPA → Planning Officer → ZDD → ZJD          ← the default
+ *   BP_STANDARD     TPA → ZAD/ZDD → ZJD → Director → AC → C     ← optional
  *
- * The stage catalogue lists the applicant-side stages (LTP_DRAFT → LTP_PAYMENT)
- * because they are real places a file sits and the register labels them. But
- * the ENGINE takes over at the payment gate: `startWorkflow` creates the
- * instance at LTP_PAYMENT and immediately performs CONFIRM_PAYMENT, which is
- * seeded below as an ordinary transition. Everything before that is driven by
- * the filing services built in Phases 2–5, and no transition rows are seeded
- * for it — configuration that nothing executes would be a lie about how the
- * system works.
- *
- * ── One deliberate departure from docs/03-workflow.md G.3 ────────────────
- *
- * The documented design leaves an answered shortfall sitting at
- * LTP_SHORTFALL_ACTION for the officer to accept from there. This seeds it the
- * other way: RESUBMIT carries the file back to the desk that parked it
- * (RETURN_TO_ORIGIN), where the officer finds it in their own queue reading
- * "Shortfall responded" and accepts or rejects it from their own stage.
- *
- * The reason is the task queue. A task belongs to a stage, and the stage's
- * owner roles decide whose inbox it appears in — so leaving an answered
- * shortfall at the applicant's stage would leave it addressed to the applicant,
- * and the officer waiting for it would never see it arrive. The engine's
- * behaviour is identical either way; this is the arrangement that produces a
- * working inbox.
+ * The action CATALOGUE below is shared. An action is a verb — "Forward",
+ * "Raise document shortfall" — and a stage acquires the ability to perform one
+ * by having a transition row that references it, which is why FORWARD is
+ * defined once and means "send it on" at ten different desks across two
+ * different chains.
  */
 
-const WORKFLOW_CODE = 'BP_STANDARD';
-
 // ═══════════════════════════════════════════════════════════════════════════
-// 1. Stages
+// Actions — shared by every workflow
 // ═══════════════════════════════════════════════════════════════════════════
-
-type StageSeed = {
-  code: string;
-  name: string;
-  type: 'LTP_ACTION' | 'REVIEW' | 'APPROVAL' | 'TERMINAL';
-  sequence: number;
-  ownerRoleKeys: string[];
-  entryStatus: string;
-  workingStatus?: string;
-  slaDays?: number;
-  isEntry?: boolean;
-  isTerminal?: boolean;
-  allowReassign?: boolean;
-  description: string;
-};
-
-/**
- * SLA days are the illustrative figures from the requirement's §26 and are
- * SEED DATA, editable at runtime. They are not law until the department
- * confirms them — see docs/10-open-questions.md Q11.
- */
-const STAGES: StageSeed[] = [
-  {
-    code: 'LTP_DRAFT',
-    name: 'Filing',
-    type: 'LTP_ACTION',
-    sequence: 10,
-    ownerRoleKeys: ['LTP'],
-    entryStatus: 'DRAFT',
-    description: 'The applicant is filling in the application. Driven by the filing wizard.',
-  },
-  {
-    code: 'LTP_DRAWING',
-    name: 'Drawing and scrutiny',
-    type: 'LTP_ACTION',
-    sequence: 20,
-    ownerRoleKeys: ['LTP'],
-    entryStatus: 'DRAWING_UPLOADED',
-    workingStatus: 'SCRUTINY_IN_PROGRESS',
-    description: 'The drawing is uploaded and checked. Driven by the scrutiny service.',
-  },
-  {
-    code: 'LTP_DOCUMENTS',
-    name: 'Documents',
-    type: 'LTP_ACTION',
-    sequence: 30,
-    ownerRoleKeys: ['LTP'],
-    entryStatus: 'DOCUMENT_UPLOAD_PENDING',
-    description: 'The checklist is being completed. Driven by the document service.',
-  },
-  {
-    code: 'LTP_PAYMENT',
-    name: 'Payment',
-    type: 'LTP_ACTION',
-    sequence: 40,
-    ownerRoleKeys: ['LTP'],
-    entryStatus: 'FEE_GENERATED',
-    workingStatus: 'PAYMENT_PENDING',
-    // Where every departmental run begins. The instance is created here and
-    // leaves immediately by CONFIRM_PAYMENT — so the first row in a file's
-    // history is the payment that carried it to the department, which is
-    // exactly the fact §8 says must be provable.
-    isEntry: true,
-    description: 'The fee is payable. A confirmed payment carries the file to the department.',
-  },
-
-  {
-    code: 'TPA_REVIEW',
-    name: 'Town Planning Assistant',
-    type: 'REVIEW',
-    sequence: 50,
-    ownerRoleKeys: ['TPA'],
-    entryStatus: 'PENDING_TPA',
-    workingStatus: 'TPA_REVIEW',
-    slaDays: 5,
-    description: 'First departmental desk. Technical scrutiny, document verification, shortfalls.',
-  },
-  {
-    code: 'ZAD_ZDD_REVIEW',
-    name: 'Zonal Assistant / Deputy Director',
-    type: 'REVIEW',
-    sequence: 60,
-    // Two roles, one desk. A task addressed to either is visible to both,
-    // because the QUEUE is scoped by the stage's owners rather than by the
-    // task's own role — see taskScope() in src/server/auth/scope.ts.
-    ownerRoleKeys: ['ZAD', 'ZDD'],
-    entryStatus: 'PENDING_ZAD_ZDD',
-    workingStatus: 'ZAD_ZDD_REVIEW',
-    slaDays: 5,
-    description: 'Zonal review.',
-  },
-  {
-    code: 'ZJD_REVIEW',
-    name: 'Zonal Joint Director',
-    type: 'REVIEW',
-    sequence: 70,
-    ownerRoleKeys: ['ZJD'],
-    entryStatus: 'PENDING_ZJD',
-    workingStatus: 'ZJD_REVIEW',
-    slaDays: 7,
-    description: 'Zonal review. May report a fee shortfall and still forward.',
-  },
-  {
-    code: 'DIRECTOR_DP_REVIEW',
-    name: 'Director (Development Plan)',
-    type: 'REVIEW',
-    sequence: 80,
-    ownerRoleKeys: ['DIRECTOR_DP'],
-    entryStatus: 'PENDING_DIRECTOR_DP',
-    workingStatus: 'DIRECTOR_REVIEW',
-    slaDays: 7,
-    description: 'City-wide review. May report a shortfall and still forward.',
-  },
-  {
-    code: 'ADDL_COMMISSIONER_REVIEW',
-    name: 'Additional Commissioner',
-    type: 'REVIEW',
-    sequence: 90,
-    ownerRoleKeys: ['ADDL_COMMISSIONER'],
-    entryStatus: 'PENDING_ADDITIONAL_COMMISSIONER',
-    workingStatus: 'ADDITIONAL_COMMISSIONER_REVIEW',
-    slaDays: 5,
-    description: 'Penultimate review. The action set is configured, not fixed — see Q5.',
-  },
-  {
-    code: 'COMMISSIONER_REVIEW',
-    name: 'Commissioner',
-    type: 'APPROVAL',
-    sequence: 100,
-    ownerRoleKeys: ['COMMISSIONER'],
-    entryStatus: 'PENDING_COMMISSIONER',
-    workingStatus: 'COMMISSIONER_REVIEW',
-    slaDays: 5,
-    description: 'Final authority. The only desk that may approve or reject.',
-  },
-
-  {
-    code: 'LTP_SHORTFALL_ACTION',
-    name: 'With the applicant',
-    type: 'LTP_ACTION',
-    sequence: 110,
-    ownerRoleKeys: ['LTP'],
-    // Set by whichever transition parked the file — TPA_DOCUMENT_SHORTFALL,
-    // ZJD_FEE_SHORTFALL, and so on. The value here is only the fallback.
-    entryStatus: 'RETURNED_TO_APPLICANT',
-    allowReassign: false,
-    description: 'A blocking shortfall has parked the file. The applicant must answer.',
-  },
-
-  {
-    code: 'CLOSED_APPROVED',
-    name: 'Approved',
-    type: 'TERMINAL',
-    sequence: 900,
-    ownerRoleKeys: [],
-    entryStatus: 'APPROVED',
-    isTerminal: true,
-    description: 'Permission granted. The approval order is issued.',
-  },
-  {
-    code: 'CLOSED_REJECTED',
-    name: 'Rejected',
-    type: 'TERMINAL',
-    sequence: 910,
-    ownerRoleKeys: [],
-    entryStatus: 'REJECTED',
-    isTerminal: true,
-    description: 'Permission refused.',
-  },
-];
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 2. Actions
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// Reusable across stages. A stage becomes able to perform one by having a
-// transition row that references it — which is why FORWARD is defined once and
-// means "send it on" at six different desks.
 
 type ActionSeed = {
   code: string;
@@ -366,6 +171,286 @@ const ACTIONS: ActionSeed[] = [
     confirmText: 'Say what settled it — the payment, or the document supplied.',
     displayOrder: 115,
   },
+
+  // ── Site inspection ────────────────────────────────────────────────────
+  //
+  // Performed by the site inspection service, never from the action modal:
+  // the transitions carry a LINK_SITE_INSPECTION effect and the action bar
+  // renders them as a pointer to the Site Inspection tab. They are catalogue
+  // entries like any other so that the history row, the audit row and the
+  // capability check are the engine's, not a second implementation.
+  {
+    code: 'SCHEDULE_SITE_INSPECTION',
+    label: 'Schedule site inspection',
+    kind: 'FORWARD',
+    intent: 'secondary',
+    capabilityKey: 'SITE_INSPECTION_SCHEDULE',
+    requiresRemarks: false,
+    displayOrder: 12,
+  },
+  {
+    code: 'SUBMIT_SITE_INSPECTION',
+    label: 'Submit inspection report',
+    kind: 'FORWARD',
+    intent: 'primary',
+    capabilityKey: 'SITE_INSPECTION_CONDUCT',
+    requiresRemarks: true,
+    confirmText: 'The signed report is locked and the file moves to the next desk.',
+    displayOrder: 13,
+  },
+  {
+    code: 'RAISE_INSPECTION_SHORTFALL',
+    label: 'Submit inspection report — raise shortfall',
+    kind: 'RETURN',
+    intent: 'secondary',
+    // The report is the act. The service ALSO requires SHORTFALL_CREATE,
+    // because this transition opens a shortfall like any other.
+    capabilityKey: 'SITE_INSPECTION_CONDUCT',
+    requiresRemarks: true,
+    confirmText: 'The signed report is locked and the application goes back to the applicant.',
+    displayOrder: 14,
+  },
+  // ── Show cause and revocation (Phase 7) ───────────────────────────────
+  //
+  // Performed by the proceedings services, never from the action modal: the
+  // notice and the proposal need particulars the modal cannot collect, so the
+  // action bar renders these as a pointer to the Proceedings tab. Catalogue
+  // entries like any other, so the history row, the audit row and the
+  // capability check are the engine's.
+  {
+    code: 'ISSUE_SHOW_CAUSE',
+    label: 'Issue show cause notice',
+    kind: 'CLARIFY',
+    intent: 'secondary',
+    capabilityKey: 'SHOW_CAUSE_ISSUE',
+    requiresRemarks: true,
+    confirmText: 'The notice is generated and sent to the Outward register for dispatch.',
+    displayOrder: 116,
+  },
+  {
+    // The applicant's answer. SYSTEM: never offered in an action bar; raised
+    // by the show cause service on the applicant's behalf and recorded in
+    // their name — the applicant owns no desk to perform it from.
+    code: 'RESPOND_SHOW_CAUSE',
+    label: 'Show cause response submitted',
+    kind: 'SYSTEM',
+    intent: 'secondary',
+    capabilityKey: '',
+    requiresRemarks: false,
+    displayOrder: 116,
+  },
+  {
+    code: 'TAKE_UP_SHOW_CAUSE',
+    label: 'Review show cause submission',
+    kind: 'FORWARD',
+    intent: 'secondary',
+    capabilityKey: 'SHOW_CAUSE_DECIDE',
+    requiresRemarks: false,
+    displayOrder: 117,
+  },
+  {
+    code: 'DECIDE_SHOW_CAUSE',
+    label: 'Decide show cause',
+    kind: 'FORWARD',
+    intent: 'secondary',
+    capabilityKey: 'SHOW_CAUSE_DECIDE',
+    requiresRemarks: true,
+    displayOrder: 118,
+  },
+  {
+    code: 'INITIATE_REVOCATION',
+    label: 'Initiate revocation',
+    kind: 'CLARIFY',
+    intent: 'destructive',
+    capabilityKey: 'REVOCATION_INITIATE',
+    requiresRemarks: true,
+    confirmText: 'A revocation proceeding is proposed for review by the revoking authority. The permission stands until it is decided.',
+    displayOrder: 140,
+  },
+  {
+    code: 'TAKE_UP_REVOCATION',
+    label: 'Take up revocation for review',
+    kind: 'FORWARD',
+    intent: 'secondary',
+    capabilityKey: 'ORDER_REVOKE',
+    requiresRemarks: false,
+    displayOrder: 141,
+  },
+  {
+    code: 'REVOKE_PROCEEDING',
+    label: 'Revoke permission',
+    kind: 'REJECT',
+    intent: 'destructive',
+    capabilityKey: 'ORDER_REVOKE',
+    requiresRemarks: true,
+    confirmText:
+      'The permission is revoked and a revocation order is sent to Outward. The approval and its history remain on the record.',
+    displayOrder: 142,
+  },
+  {
+    code: 'REJECT_REVOCATION',
+    label: 'Reject revocation proposal',
+    kind: 'FORWARD',
+    intent: 'secondary',
+    capabilityKey: 'ORDER_REVOKE',
+    requiresRemarks: true,
+    displayOrder: 143,
+  },
+  // ── Change of technical professional (Phase 8) ────────────────────────
+  //
+  // SYSTEM-kind, all five: raised by the professional change service on
+  // behalf of the officer taking the step, after it has checked the step's
+  // capability (PROFESSIONAL_CHANGE_*) and the officer's jurisdiction. A
+  // request travels TPA → Planning Officer → ZDD → ZJD wherever the file
+  // itself is, and a desk transition may only be granted to a role owning the
+  // file's stage — so the desk is the capability's holder, and the engine
+  // records the step in the file's history with that officer's name.
+  {
+    code: 'REQUEST_PROFESSIONAL_CHANGE',
+    label: 'Change of technical professional requested',
+    kind: 'SYSTEM',
+    intent: 'secondary',
+    capabilityKey: '',
+    requiresRemarks: false,
+    displayOrder: 150,
+  },
+  {
+    code: 'VERIFY_PROFESSIONAL_CHANGE',
+    label: 'Change of technical professional verified',
+    kind: 'SYSTEM',
+    intent: 'secondary',
+    capabilityKey: '',
+    requiresRemarks: false,
+    displayOrder: 151,
+  },
+  {
+    code: 'REVIEW_PROFESSIONAL_CHANGE',
+    label: 'Change of technical professional reviewed',
+    kind: 'SYSTEM',
+    intent: 'secondary',
+    capabilityKey: '',
+    requiresRemarks: false,
+    displayOrder: 152,
+  },
+  {
+    code: 'APPROVE_PROFESSIONAL_CHANGE',
+    label: 'Change of technical professional approved',
+    kind: 'SYSTEM',
+    intent: 'secondary',
+    capabilityKey: '',
+    requiresRemarks: false,
+    displayOrder: 153,
+  },
+  {
+    code: 'REJECT_PROFESSIONAL_CHANGE',
+    label: 'Change of technical professional rejected',
+    kind: 'SYSTEM',
+    intent: 'secondary',
+    capabilityKey: '',
+    requiresRemarks: false,
+    displayOrder: 154,
+  },
+  // ── Commencement of work (Phase 9) ────────────────────────────────────
+  //
+  // SYSTEM-kind: raised by the commencement service on behalf of the file's
+  // technical professional, after it has checked COMMENCEMENT_NOTIFY and row
+  // scope. The professional owns no desk at CLOSED_APPROVED, so — like the
+  // applicant's show cause answer — the step cannot be a desk transition.
+  {
+    code: 'NOTIFY_WORK_COMMENCEMENT',
+    label: 'Commencement of work notified',
+    kind: 'SYSTEM',
+    intent: 'secondary',
+    capabilityKey: '',
+    requiresRemarks: false,
+    displayOrder: 160,
+  },
+  // ── Occupancy (Phase 10) ──────────────────────────────────────────────
+  //
+  // SYSTEM-kind, all nine: raised by the occupancy service for whoever holds
+  // the step's OCCUPANCY_* capability. The file sits at CLOSED_APPROVED, a
+  // stage no desk works, so none can be a desk transition.
+  {
+    code: 'SUBMIT_OCCUPANCY',
+    label: 'Completion intimated — occupancy applied for',
+    kind: 'SYSTEM',
+    intent: 'secondary',
+    capabilityKey: '',
+    requiresRemarks: false,
+    displayOrder: 170,
+  },
+  {
+    code: 'SCHEDULE_FINAL_INSPECTION',
+    label: 'Final inspection scheduled',
+    kind: 'SYSTEM',
+    intent: 'secondary',
+    capabilityKey: '',
+    requiresRemarks: false,
+    displayOrder: 171,
+  },
+  {
+    code: 'RECORD_FINAL_INSPECTION',
+    label: 'Final inspection recorded',
+    kind: 'SYSTEM',
+    intent: 'secondary',
+    capabilityKey: '',
+    requiresRemarks: false,
+    displayOrder: 172,
+  },
+  {
+    code: 'RECOMMEND_OCCUPANCY',
+    label: 'Occupancy recommended',
+    kind: 'SYSTEM',
+    intent: 'secondary',
+    capabilityKey: '',
+    requiresRemarks: false,
+    displayOrder: 173,
+  },
+  {
+    code: 'RAISE_OCCUPANCY_SHORTFALL',
+    label: 'Occupancy shortfall raised',
+    kind: 'SYSTEM',
+    intent: 'secondary',
+    capabilityKey: '',
+    requiresRemarks: false,
+    displayOrder: 174,
+  },
+  {
+    code: 'RESPOND_OCCUPANCY_SHORTFALL',
+    label: 'Occupancy shortfall answered',
+    kind: 'SYSTEM',
+    intent: 'secondary',
+    capabilityKey: '',
+    requiresRemarks: false,
+    displayOrder: 175,
+  },
+  {
+    code: 'APPROVE_OCCUPANCY',
+    label: 'Occupancy approved',
+    kind: 'SYSTEM',
+    intent: 'secondary',
+    capabilityKey: '',
+    requiresRemarks: false,
+    displayOrder: 176,
+  },
+  {
+    code: 'REJECT_OCCUPANCY',
+    label: 'Occupancy rejected',
+    kind: 'SYSTEM',
+    intent: 'secondary',
+    capabilityKey: '',
+    requiresRemarks: false,
+    displayOrder: 177,
+  },
+  {
+    code: 'ISSUE_OCCUPANCY_CERTIFICATE',
+    label: 'Occupancy certificate issued',
+    kind: 'SYSTEM',
+    intent: 'secondary',
+    capabilityKey: '',
+    requiresRemarks: false,
+    displayOrder: 178,
+  },
   {
     code: 'APPROVE',
     label: 'Approve',
@@ -389,401 +474,16 @@ const ACTIONS: ActionSeed[] = [
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 3. Transitions
-// ═══════════════════════════════════════════════════════════════════════════
-
-type TransitionSeed = {
-  from: string;
-  action: string;
-  /** Null applies whatever the current status is. */
-  fromStatus?: string | null;
-  /** Null when an effect chooses — RETURN_TO_ORIGIN resumes the parked stage. */
-  to: string | null;
-  toStatus: string;
-  allowedRoleKeys?: string[];
-  guards?: string[];
-  effects?: Array<Record<string, unknown>>;
-  notify?: string;
-  sla?: 'START' | 'PAUSE' | 'RESUME' | 'STOP' | 'NONE';
-};
-
-/** The departmental pipeline, in order. Used to generate FORWARD and RETURN. */
-const PIPELINE = [
-  'TPA_REVIEW',
-  'ZAD_ZDD_REVIEW',
-  'ZJD_REVIEW',
-  'DIRECTOR_DP_REVIEW',
-  'ADDL_COMMISSIONER_REVIEW',
-  'COMMISSIONER_REVIEW',
-] as const;
-
-const ENTRY_STATUS: Record<string, string> = Object.fromEntries(
-  STAGES.map((s) => [s.code, s.entryStatus])
-);
-
-const WORKING_STATUS: Record<string, string> = Object.fromEntries(
-  STAGES.map((s) => [s.code, s.workingStatus ?? s.entryStatus])
-);
-
-/** The status a file takes while parked, per raising stage and kind. */
-const PARKED_STATUS: Record<string, Record<string, string>> = {
-  TPA_REVIEW: {
-    DOCUMENT: 'TPA_DOCUMENT_SHORTFALL',
-    FEE: 'TPA_FEE_SHORTFALL',
-    TECHNICAL: 'TPA_TECHNICAL_SHORTFALL',
-    CLARIFICATION: 'RETURNED_TO_APPLICANT',
-  },
-  ZAD_ZDD_REVIEW: {
-    DOCUMENT: 'ZAD_ZDD_SHORTFALL',
-    CLARIFICATION: 'ZAD_ZDD_SHORTFALL',
-  },
-  ZJD_REVIEW: {
-    DOCUMENT: 'ZJD_SHORTFALL',
-    FEE: 'ZJD_FEE_SHORTFALL',
-  },
-  DIRECTOR_DP_REVIEW: {
-    DOCUMENT: 'DIRECTOR_SHORTFALL',
-    FEE: 'DIRECTOR_SHORTFALL',
-    TECHNICAL: 'DIRECTOR_SHORTFALL',
-  },
-  ADDL_COMMISSIONER_REVIEW: {
-    DOCUMENT: 'ADDITIONAL_COMMISSIONER_SHORTFALL',
-  },
-  COMMISSIONER_REVIEW: {
-    DOCUMENT: 'COMMISSIONER_SHORTFALL',
-  },
-};
-
-/** A blocking shortfall: park the file, pause the clock. */
-const park = (from: string, kind: string, action: string, extra: Array<Record<string, unknown>> = []): TransitionSeed => ({
-  from,
-  action,
-  to: 'LTP_SHORTFALL_ACTION',
-  toStatus: PARKED_STATUS[from]?.[kind] ?? 'RETURNED_TO_APPLICANT',
-  guards: ['has_remarks'],
-  effects: [{ type: 'RAISE_SHORTFALL', kind, mode: 'BLOCKING' }, ...extra],
-  // No `notify`: the shortfall engine emits SHORTFALL_RAISED itself, carrying
-  // the shortfall id the dispatcher needs in order to record that somebody was
-  // actually told. A second event here would announce one decision twice.
-  notify: '',
-  sla: 'PAUSE',
-});
-
-/** A reported shortfall: record it, and move on regardless. */
-const report = (from: string, kind: string, action: string, extra: Array<Record<string, unknown>> = []): TransitionSeed => {
-  const next = PIPELINE[PIPELINE.indexOf(from as never) + 1]!;
-  return {
-    from,
-    action,
-    to: next,
-    toStatus: from === 'DIRECTOR_DP_REVIEW' ? 'DIRECTOR_REPORTED_SHORTFALL' : ENTRY_STATUS[next]!,
-    guards: ['has_remarks'],
-    effects: [{ type: 'RAISE_SHORTFALL', kind, mode: 'REPORTED' }, ...extra],
-    // The shortfall engine announces the shortfall; this announces the
-    // movement, which is a different fact for a different reader — the next
-    // desk needs to know the file has arrived.
-    notify: 'APPLICATION_FORWARDED',
-    // The clock keeps running. That is the whole difference from `park`: the
-    // department has not stopped work, so it is still measuring itself.
-    sla: 'START',
-  };
-};
-
-/** Send it on to the next desk. */
-const forward = (from: string): TransitionSeed => {
-  const next = PIPELINE[PIPELINE.indexOf(from as never) + 1]!;
-  return {
-    from,
-    action: 'FORWARD',
-    to: next,
-    toStatus: ENTRY_STATUS[next]!,
-    guards: ['has_remarks'],
-    notify: 'APPLICATION_FORWARDED',
-    sla: 'START',
-  };
-};
-
-/** Send it back one desk. */
-const returnBack = (from: string): TransitionSeed => {
-  const previous = PIPELINE[PIPELINE.indexOf(from as never) - 1]!;
-  return {
-    from,
-    action: 'RETURN_TO_PREVIOUS',
-    to: previous,
-    toStatus: ENTRY_STATUS[previous]!,
-    guards: ['has_remarks'],
-    notify: 'APPLICATION_RETURNED',
-    sla: 'START',
-  };
-};
-
-/** Accept or reject the applicant's answer, from the desk that raised it. */
-/**
- * Close a shortfall that TRAVELLED here rather than parking the file.
- *
- * A reported shortfall has no parked stage and no RESUBMIT to answer it: the
- * applicant settles it by paying the demand or supplying the document, and
- * whichever officer holds the file then records that it is settled. Every
- * review desk gets this, because a reported shortfall may still be open at any
- * of them — and since an open one blocks approval absolutely, a file with no
- * way to close one could never be approved.
- */
-const closeReported = (stage: string): TransitionSeed => ({
-  from: stage,
-  action: 'RESOLVE_REPORTED_SHORTFALL',
-  fromStatus: null,
-  // Same stage: settling a shortfall is not a movement, and the officer keeps
-  // the file and the clock they already had.
-  to: stage,
-  toStatus: WORKING_STATUS[stage]!,
-  guards: ['reported_shortfall_open', 'has_remarks'],
-  effects: [{ type: 'RESOLVE_SHORTFALL', mode: 'REPORTED' }],
-  notify: '',
-  sla: 'NONE',
-});
-
-const shortfallVerdict = (stage: string): TransitionSeed[] => [
-  {
-    from: stage,
-    action: 'ACCEPT_RESOLUTION',
-    fromStatus: 'SHORTFALL_RESPONDED',
-    // Same stage: the officer keeps the file they are already holding, and
-    // their SLA — resumed when the answer arrived — keeps running.
-    to: stage,
-    toStatus: WORKING_STATUS[stage]!,
-    guards: ['shortfall_awaiting_review', 'has_remarks'],
-    effects: [{ type: 'RESOLVE_SHORTFALL' }],
-    notify: '',
-    sla: 'NONE',
-  },
-  {
-    from: stage,
-    action: 'REJECT_RESOLUTION',
-    fromStatus: 'SHORTFALL_RESPONDED',
-    to: 'LTP_SHORTFALL_ACTION',
-    toStatus: 'RETURNED_TO_APPLICANT',
-    guards: ['shortfall_awaiting_review', 'has_remarks'],
-    effects: [{ type: 'REJECT_RESOLUTION' }],
-    notify: '',
-    sla: 'PAUSE',
-  },
-];
-
-const TRANSITIONS: TransitionSeed[] = [
-  // ── The gate. §8: only a confirmed payment carries a file here ─────────
-  {
-    from: 'LTP_PAYMENT',
-    action: 'CONFIRM_PAYMENT',
-    fromStatus: null,
-    to: 'TPA_REVIEW',
-    toStatus: 'PENDING_TPA',
-    guards: ['fees_paid'],
-    notify: 'APPLICATION_FORWARDED',
-    sla: 'START',
-  },
-
-  // ── §5 TPA ─────────────────────────────────────────────────────────────
-  forward('TPA_REVIEW'),
-  park('TPA_REVIEW', 'DOCUMENT', 'RAISE_DOCUMENT_SHORTFALL'),
-  park('TPA_REVIEW', 'FEE', 'RAISE_FEE_SHORTFALL', [
-    { type: 'GENERATE_FEE_DEMAND', demandType: 'SHORTFALL' },
-  ]),
-  park('TPA_REVIEW', 'TECHNICAL', 'RAISE_TECHNICAL_SHORTFALL'),
-  // The first desk has no previous DESK, so its "return" is to the applicant.
-  // Modelled as a clarification rather than as a special case, so the file is
-  // parked, the applicant is told what is wanted, and the same RESUBMIT path
-  // brings it back.
-  park('TPA_REVIEW', 'CLARIFICATION', 'RETURN_TO_PREVIOUS'),
-  ...shortfallVerdict('TPA_REVIEW'),
-  closeReported('TPA_REVIEW'),
-
-  // ── §6 ZAD / ZDD ───────────────────────────────────────────────────────
-  forward('ZAD_ZDD_REVIEW'),
-  park('ZAD_ZDD_REVIEW', 'DOCUMENT', 'RAISE_DOCUMENT_SHORTFALL'),
-  park('ZAD_ZDD_REVIEW', 'CLARIFICATION', 'RAISE_CLARIFICATION'),
-  returnBack('ZAD_ZDD_REVIEW'),
-  ...shortfallVerdict('ZAD_ZDD_REVIEW'),
-  closeReported('ZAD_ZDD_REVIEW'),
-
-  // ── §7 ZJD — the desk that may report a FEE shortfall and forward ──────
-  forward('ZJD_REVIEW'),
-  park('ZJD_REVIEW', 'DOCUMENT', 'RAISE_DOCUMENT_SHORTFALL'),
-  park('ZJD_REVIEW', 'FEE', 'RAISE_FEE_SHORTFALL', [
-    { type: 'GENERATE_FEE_DEMAND', demandType: 'SHORTFALL' },
-  ]),
-  report('ZJD_REVIEW', 'FEE', 'REPORT_FEE_SHORTFALL_AND_FORWARD', [
-    { type: 'GENERATE_FEE_DEMAND', demandType: 'SHORTFALL' },
-  ]),
-  returnBack('ZJD_REVIEW'),
-  ...shortfallVerdict('ZJD_REVIEW'),
-  closeReported('ZJD_REVIEW'),
-
-  // ── §8 Director — may report ANY shortfall and forward ─────────────────
-  forward('DIRECTOR_DP_REVIEW'),
-  park('DIRECTOR_DP_REVIEW', 'DOCUMENT', 'RAISE_DOCUMENT_SHORTFALL'),
-  park('DIRECTOR_DP_REVIEW', 'TECHNICAL', 'RAISE_TECHNICAL_SHORTFALL'),
-  park('DIRECTOR_DP_REVIEW', 'FEE', 'RAISE_FEE_SHORTFALL', [
-    { type: 'GENERATE_FEE_DEMAND', demandType: 'SHORTFALL' },
-  ]),
-  report('DIRECTOR_DP_REVIEW', 'DOCUMENT', 'REPORT_SHORTFALL_AND_FORWARD'),
-  returnBack('DIRECTOR_DP_REVIEW'),
-  ...shortfallVerdict('DIRECTOR_DP_REVIEW'),
-  closeReported('DIRECTOR_DP_REVIEW'),
-
-  // ── §9 Additional Commissioner ─────────────────────────────────────────
-  //
-  // §14 says only "configurable according to workflow configuration" — so this
-  // is a PROVISIONAL seed (Q5), and changing it is an admin edit rather than a
-  // code change. That is precisely the claim this engine exists to make good.
-  forward('ADDL_COMMISSIONER_REVIEW'),
-  park('ADDL_COMMISSIONER_REVIEW', 'DOCUMENT', 'RAISE_DOCUMENT_SHORTFALL'),
-  report('ADDL_COMMISSIONER_REVIEW', 'DOCUMENT', 'REPORT_SHORTFALL_AND_FORWARD'),
-  returnBack('ADDL_COMMISSIONER_REVIEW'),
-  ...shortfallVerdict('ADDL_COMMISSIONER_REVIEW'),
-  closeReported('ADDL_COMMISSIONER_REVIEW'),
-
-  // ── §10 Commissioner ───────────────────────────────────────────────────
-  {
-    from: 'COMMISSIONER_REVIEW',
-    action: 'APPROVE',
-    to: 'CLOSED_APPROVED',
-    toStatus: 'APPROVED',
-    // THE approval guard. `no_open_shortfalls` counts every open shortfall of
-    // every kind and every mode, with no override anywhere in the system —
-    // docs/03-workflow.md F.5.1. A reported shortfall that travelled here with
-    // the file blocks approval exactly as a blocking one would.
-    guards: ['no_open_shortfalls', 'fees_paid', 'has_remarks'],
-    effects: [
-      { type: 'GENERATE_APPROVAL_ORDER' },
-      { type: 'CLOSE_WORKFLOW', status: 'COMPLETED', outcome: 'APPROVED' },
-    ],
-    notify: 'APPLICATION_APPROVED',
-    sla: 'STOP',
-  },
-  {
-    from: 'COMMISSIONER_REVIEW',
-    action: 'REJECT',
-    to: 'CLOSED_REJECTED',
-    toStatus: 'REJECTED',
-    guards: ['has_remarks'],
-    effects: [{ type: 'CLOSE_WORKFLOW', status: 'COMPLETED', outcome: 'REJECTED' }],
-    notify: 'APPLICATION_REJECTED',
-    sla: 'STOP',
-  },
-  park('COMMISSIONER_REVIEW', 'DOCUMENT', 'RAISE_DOCUMENT_SHORTFALL'),
-  returnBack('COMMISSIONER_REVIEW'),
-  ...shortfallVerdict('COMMISSIONER_REVIEW'),
-  closeReported('COMMISSIONER_REVIEW'),
-
-  // ── The applicant's answer ─────────────────────────────────────────────
-  //
-  // One row covers every parked status, because the destination is not in the
-  // configuration at all: RETURN_TO_ORIGIN reads `parkedStageId`. That is why
-  // there is no table here mapping each shortfall status back to a desk.
-  {
-    from: 'LTP_SHORTFALL_ACTION',
-    action: 'RESUBMIT',
-    fromStatus: null,
-    to: null,
-    toStatus: 'SHORTFALL_RESPONDED',
-    allowedRoleKeys: ['LTP'],
-    guards: ['has_remarks'],
-    effects: [{ type: 'RECORD_RESOLUTION' }, { type: 'RETURN_TO_ORIGIN' }],
-    notify: '',
-    // The desk's clock picks up where it left off, with the days it had left.
-    sla: 'RESUME',
-  },
-];
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 4. Assignment rules
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// Who each desk's work is addressed to. ROLE_QUEUE everywhere by default: the
-// task lands in a shared inbox and an officer claims it. Naming a person is a
-// deliberate act (DIRECT), and spreading work automatically is another
-// (LEAST_LOADED) — both are rows, so a department can change how it distributes
-// work without anybody deploying anything.
-
-const ASSIGNMENTS: Array<{
-  stage: string;
-  roleKey: string;
-  strategy: 'ROLE_QUEUE' | 'LEAST_LOADED';
-  priority: number;
-  notes: string;
-}> = [
-  { stage: 'TPA_REVIEW', roleKey: 'TPA', strategy: 'ROLE_QUEUE', priority: 0, notes: 'Shared TPA inbox.' },
-  { stage: 'ZAD_ZDD_REVIEW', roleKey: 'ZAD', strategy: 'ROLE_QUEUE', priority: 0, notes: 'ZAD and ZDD share this desk.' },
-  { stage: 'ZJD_REVIEW', roleKey: 'ZJD', strategy: 'ROLE_QUEUE', priority: 5, notes: '' },
-  { stage: 'DIRECTOR_DP_REVIEW', roleKey: 'DIRECTOR_DP', strategy: 'ROLE_QUEUE', priority: 10, notes: 'Senior desk — sorts above zonal work.' },
-  { stage: 'ADDL_COMMISSIONER_REVIEW', roleKey: 'ADDL_COMMISSIONER', strategy: 'ROLE_QUEUE', priority: 15, notes: '' },
-  { stage: 'COMMISSIONER_REVIEW', roleKey: 'COMMISSIONER', strategy: 'ROLE_QUEUE', priority: 20, notes: 'Approval decisions sort to the top.' },
-  { stage: 'LTP_SHORTFALL_ACTION', roleKey: 'LTP', strategy: 'ROLE_QUEUE', priority: 0, notes: 'Addressed to the applicant who filed it.' },
-];
-
-// ═══════════════════════════════════════════════════════════════════════════
 // Seeding
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** The workflow new applications are routed through. */
+export const DEFAULT_WORKFLOW_CODE = BBAS_STANDARD.code;
+
 export async function seedWorkflow(prisma: PrismaClient) {
-  const workflow = await prisma.workflow.upsert({
-    where: { code_version: { code: WORKFLOW_CODE, version: 1 } },
-    create: {
-      code: WORKFLOW_CODE,
-      version: 1,
-      name: 'Standard building permission workflow',
-      description: 'TPA → ZAD/ZDD → ZJD → Director → Additional Commissioner → Commissioner.',
-    },
-    update: {
-      name: 'Standard building permission workflow',
-      description: 'TPA → ZAD/ZDD → ZJD → Director → Additional Commissioner → Commissioner.',
-    },
-  });
-
-  // ── Stages ──────────────────────────────────────────────────────────────
-  const stageIds = new Map<string, string>();
-
-  for (const stage of STAGES) {
-    const row = await prisma.workflowStage.upsert({
-      where: { workflowId_code: { workflowId: workflow.id, code: stage.code } },
-      create: {
-        workflowId: workflow.id,
-        code: stage.code,
-        name: stage.name,
-        type: stage.type,
-        sequence: stage.sequence,
-        ownerRoleKeys: stage.ownerRoleKeys,
-        entryStatus: stage.entryStatus as never,
-        workingStatus: (stage.workingStatus ?? null) as never,
-        slaDays: stage.slaDays ?? 0,
-        isEntry: stage.isEntry ?? false,
-        isTerminal: stage.isTerminal ?? false,
-        allowReassign: stage.allowReassign ?? true,
-        description: stage.description,
-      },
-      update: {
-        name: stage.name,
-        type: stage.type,
-        sequence: stage.sequence,
-        ownerRoleKeys: stage.ownerRoleKeys,
-        entryStatus: stage.entryStatus as never,
-        workingStatus: (stage.workingStatus ?? null) as never,
-        slaDays: stage.slaDays ?? 0,
-        isEntry: stage.isEntry ?? false,
-        isTerminal: stage.isTerminal ?? false,
-        allowReassign: stage.allowReassign ?? true,
-        description: stage.description,
-        isActive: true,
-      },
-    });
-    stageIds.set(stage.code, row.id);
-  }
-
-  // ── Actions ─────────────────────────────────────────────────────────────
-  const actionIds = new Map<string, string>();
-
+  // ── Actions first: the definitions reference them by code ──────────────
   for (const action of ACTIONS) {
-    const row = await prisma.workflowAction.upsert({
+    await prisma.workflowAction.upsert({
       where: { code: action.code },
       create: {
         code: action.code,
@@ -808,156 +508,56 @@ export async function seedWorkflow(prisma: PrismaClient) {
         isActive: true,
       },
     });
-    actionIds.set(action.code, row.id);
   }
 
-  // ── Transitions ─────────────────────────────────────────────────────────
+  // ── Both chains ────────────────────────────────────────────────────────
+  const built: BuildResult[] = [];
+  built.push(await buildWorkflow(prisma, BBAS_STANDARD));
+  built.push(await buildWorkflow(prisma, BP_STANDARD));
+
+  // ── Point new applications at the default ──────────────────────────────
   //
-  // Rows not in this seed are DEACTIVATED rather than deleted: a running
-  // instance may have taken one, and its history row names it. Deleting the
-  // row would leave that history referring to something that no longer exists.
-  const seededTransitionIds: string[] = [];
-
-  for (const t of TRANSITIONS) {
-    const fromStageId = stageIds.get(t.from);
-    const actionId = actionIds.get(t.action);
-    if (!fromStageId || !actionId) {
-      throw new Error(`Workflow seed: unknown stage or action in transition ${t.from} → ${t.action}`);
-    }
-
-    const data = {
-      workflowId: workflow.id,
-      fromStageId,
-      actionId,
-      fromStatus: (t.fromStatus ?? null) as never,
-      toStageId: t.to ? (stageIds.get(t.to) ?? null) : null,
-      toStatus: t.toStatus as never,
-      allowedRoleKeys: t.allowedRoleKeys ?? [],
-      guards: t.guards ?? [],
-      effects: (t.effects ?? []) as never,
-      notifyEvent: t.notify ?? '',
-      slaBehavior: t.sla ?? 'NONE',
-      isActive: true,
-    };
-
-    // `findFirst` then create/update rather than `upsert`: `fromStatus` is
-    // nullable and Prisma refuses a null inside a composite unique key, which
-    // is exactly the shape every "applies to any status" row has.
-    const existing = await prisma.workflowTransition.findFirst({
-      where: {
-        workflowId: workflow.id,
-        fromStageId,
-        actionId,
-        fromStatus: (t.fromStatus ?? null) as never,
-      },
-      select: { id: true },
-    });
-
-    const row = existing
-      ? await prisma.workflowTransition.update({ where: { id: existing.id }, data })
-      : await prisma.workflowTransition.create({ data });
-
-    seededTransitionIds.push(row.id);
-  }
-
-  const { count: retired } = await prisma.workflowTransition.updateMany({
-    where: { workflowId: workflow.id, id: { notIn: seededTransitionIds }, isActive: true },
-    data: { isActive: false },
+  // Only the TYPE is repointed, which decides where a file that has not yet
+  // started a run will go. Applications already running keep the workflow their
+  // instance was pinned to at `startWorkflow` — that pin is what stops a
+  // configuration edit from corrupting a file in flight, and re-routing an
+  // active one is a deliberate, audited operation (scripts/align-bbas-workflow.ts),
+  // never a side effect of seeding.
+  const bbas = await prisma.workflow.findFirstOrThrow({
+    where: { code: DEFAULT_WORKFLOW_CODE, version: BBAS_STANDARD.version },
+    select: { id: true, isPublished: true },
   });
 
-  // ── SLA rules ───────────────────────────────────────────────────────────
-  let slaRules = 0;
-  for (const stage of STAGES) {
-    if (!stage.slaDays) continue;
-    const stageId = stageIds.get(stage.code)!;
-
-    // Same nullable-composite-key limitation as the transitions above: the
-    // general rule for a stage has no application type, so it is matched by
-    // hand rather than through the unique key.
-    const existing = await prisma.slaRule.findFirst({
-      where: { workflowStageId: stageId, applicationTypeId: null },
-      select: { id: true },
+  let repointed = 0;
+  if (bbas.isPublished) {
+    const { count } = await prisma.applicationType.updateMany({
+      where: { workflowId: { not: bbas.id }, deletedAt: null },
+      data: { workflowId: bbas.id },
     });
-
-    if (existing) {
-      await prisma.slaRule.update({
-        where: { id: existing.id },
-        data: { days: stage.slaDays, isActive: true },
-      });
-    } else {
-      await prisma.slaRule.create({
-        data: {
-          workflowStageId: stageId,
-          days: stage.slaDays,
-          calendar: 'WORKING_DAYS',
-          warnAtPercent: 70,
-          pauseOnShortfall: true,
-        },
-      });
-    }
-    slaRules += 1;
-  }
-
-  // ── Assignment rules ────────────────────────────────────────────────────
-  for (const rule of ASSIGNMENTS) {
-    const stageId = stageIds.get(rule.stage);
-    if (!stageId) continue;
-
-    // The unique key includes a nullable zone, so the "every zone" rule is
-    // matched by hand — `upsert` cannot express a NULL in a composite key.
-    const existing = await prisma.workflowAssignment.findFirst({
-      where: { stageId, roleKey: rule.roleKey, zoneId: null },
-      select: { id: true },
-    });
-
-    if (existing) {
-      await prisma.workflowAssignment.update({
-        where: { id: existing.id },
-        data: { strategy: rule.strategy, priority: rule.priority, notes: rule.notes, isActive: true },
-      });
-    } else {
-      await prisma.workflowAssignment.create({
-        data: {
-          workflowId: workflow.id,
-          stageId,
-          roleKey: rule.roleKey,
-          strategy: rule.strategy,
-          priority: rule.priority,
-          notes: rule.notes,
-        },
-      });
-    }
-  }
-
-  // ── Validate, then publish ──────────────────────────────────────────────
-  //
-  // The seed publishes ONLY a workflow that validates. A graph with a dead end
-  // or an unknown guard stays unpublished, and `startWorkflow` refuses to route
-  // applications through an unpublished workflow — so the failure is a clear
-  // refusal at the gate rather than a file stuck at a desk with no way out.
-  const { validateWorkflow } = await import('../../src/server/workflow/validate');
-  const report = await validateWorkflow(prisma, workflow.id);
-
-  if (report.valid) {
-    await prisma.workflow.update({
-      where: { id: workflow.id },
-      data: { isPublished: true, publishedAt: new Date() },
-    });
-  } else {
-    await prisma.workflow.update({
-      where: { id: workflow.id },
-      data: { isPublished: false },
-    });
+    repointed = count;
   }
 
   return {
-    stages: STAGES.length,
+    workflows: built.map((b) => ({
+      code: b.code,
+      stages: b.stages,
+      transitions: b.transitions,
+      retired: b.retired,
+      slaRules: b.slaRules,
+      assignments: b.assignments,
+      published: b.published,
+      issues: b.issues,
+    })),
     actions: ACTIONS.length,
-    transitions: TRANSITIONS.length,
-    retired,
-    slaRules,
-    assignments: ASSIGNMENTS.length,
-    published: report.valid,
-    issues: report.issues,
+    defaultWorkflow: DEFAULT_WORKFLOW_CODE,
+    applicationTypesRepointed: repointed,
+    // The aggregate shape the seed runner prints.
+    stages: built.reduce((n, b) => n + b.stages, 0),
+    transitions: built.reduce((n, b) => n + b.transitions, 0),
+    retired: built.reduce((n, b) => n + b.retired, 0),
+    slaRules: built.reduce((n, b) => n + b.slaRules, 0),
+    assignments: built.reduce((n, b) => n + b.assignments, 0),
+    published: built.every((b) => b.published),
+    issues: built.flatMap((b) => b.issues),
   };
 }

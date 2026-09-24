@@ -47,6 +47,43 @@ const MASTER_DATA: Array<{ category: string; code: string; label: string; order:
   { category: 'LTP_CLASS', code: 'CLASS_I', label: 'Class-I', order: 1 },
   { category: 'LTP_CLASS', code: 'CLASS_II', label: 'Class-II', order: 2 },
   { category: 'LTP_CLASS', code: 'CLASS_III', label: 'Class-III', order: 3 },
+
+  // ── The BBAS general-information lists ──────────────────────────────
+  //
+  // Master data and not enums, for the reason the header of
+  // prisma/schema.prisma gives: these are lists a jurisdiction extends, and
+  // adding "Regularisation" to them must never require a migration. The
+  // values below are the ones the BBAS manuals name in the course of
+  // describing the forms; a jurisdiction with more adds them in Settings.
+  { category: 'CASE_TYPE', code: 'NEW', label: 'New', order: 1 },
+  { category: 'CASE_TYPE', code: 'REVISED', label: 'Revised', order: 2 },
+  { category: 'CASE_TYPE', code: 'RENEWAL', label: 'Renewal', order: 3 },
+
+  { category: 'PERMISSION_TYPE', code: 'BUILDING', label: 'Building permission', order: 1 },
+  { category: 'PERMISSION_TYPE', code: 'LAYOUT', label: 'Layout permission', order: 2 },
+  { category: 'PERMISSION_TYPE', code: 'SUB_DIVISION', label: 'Sub-division', order: 3 },
+
+  { category: 'NATURE_OF_PERMISSION', code: 'INDIVIDUAL', label: 'Individual building', order: 1 },
+  { category: 'NATURE_OF_PERMISSION', code: 'GROUP_HOUSING', label: 'Group housing', order: 2 },
+  { category: 'NATURE_OF_PERMISSION', code: 'MULTI_STOREYED', label: 'Multi-storeyed building', order: 3 },
+  { category: 'NATURE_OF_PERMISSION', code: 'COMMERCIAL_COMPLEX', label: 'Commercial complex', order: 4 },
+
+  { category: 'LAND_TYPE', code: 'PATTA', label: 'Patta', order: 1 },
+  { category: 'LAND_TYPE', code: 'FREEHOLD', label: 'Freehold', order: 2 },
+  { category: 'LAND_TYPE', code: 'ASSIGNED', label: 'Assigned', order: 3 },
+  { category: 'LAND_TYPE', code: 'ENDOWMENT', label: 'Endowment', order: 4 },
+  { category: 'LAND_TYPE', code: 'GOVERNMENT', label: 'Government', order: 5 },
+
+  // Derived from the checklist, never chosen by hand — the list exists so the
+  // register's filter and the detail screen read the same labels.
+  { category: 'RISK_CATEGORY', code: 'LOW', label: 'Low', order: 1 },
+  { category: 'RISK_CATEGORY', code: 'MEDIUM', label: 'Medium', order: 2 },
+  { category: 'RISK_CATEGORY', code: 'HIGH', label: 'High', order: 3 },
+
+  { category: 'NATURE_OF_SITE', code: 'VACANT', label: 'Vacant', order: 1 },
+  { category: 'NATURE_OF_SITE', code: 'PARTLY_BUILT', label: 'Partly built upon', order: 2 },
+  { category: 'NATURE_OF_SITE', code: 'BUILT_UP', label: 'Built upon', order: 3 },
+  { category: 'NATURE_OF_SITE', code: 'AGRICULTURAL', label: 'Agricultural', order: 4 },
 ];
 
 const APPLICATION_TYPES = [

@@ -72,6 +72,10 @@ export type TemplateRow = {
 };
 
 /** Default fallback templates if custom DB template is not found */
+/** Events that can be rendered without a database template. */
+export const hasFallbackTemplate = (eventCode: string): boolean =>
+  eventCode in DEFAULT_FALLBACK_TEMPLATES;
+
 const DEFAULT_FALLBACK_TEMPLATES: Record<string, Record<Channel, { subject: string; body: string }>> = {
   APPLICATION_CREATED: {
     IN_APP: {
@@ -267,6 +271,10 @@ export async function enrichTemplatePayload(
 
       if (app) {
         if (!enriched.applicationNumber) enriched.applicationNumber = app.applicationNumber;
+        // The desk, in the words the notice should use. `stageName` is what
+        // the Phase 3 desk templates interpolate; `currentStage` is the older
+        // name and stays for the templates that already use it.
+        if (!enriched.stageName) enriched.stageName = stageLabel(app.currentStageCode);
         if (!enriched.applicantName && app.applicant?.name) enriched.applicantName = app.applicant.name;
         if (!enriched.status) enriched.status = app.status;
         if (!enriched.currentStage) enriched.currentStage = stageLabel(app.currentStageCode);
@@ -299,6 +307,22 @@ export async function enrichTemplatePayload(
   if (!enriched.currentStage) enriched.currentStage = 'Review';
   if (!enriched.shortfallReason) enriched.shortfallReason = 'Required documentation clarification';
   if (!enriched.amount) enriched.amount = '₹0.00';
+  if (!enriched.stageName) enriched.stageName = enriched.currentStage;
+
+  /**
+   * The deadline sentence, or an honest silence.
+   *
+   * A desk notice reading "Due by —" teaches the reader to ignore the line.
+   * Where no SLA rule applies to the stage there IS no date, and saying so in
+   * a sentence is better than printing a placeholder that looks like data.
+   */
+  if (!enriched.dueLine) {
+    const due = enriched.dueDate ? new Date(String(enriched.dueDate)) : null;
+    enriched.dueLine =
+      due && !Number.isNaN(due.getTime())
+        ? `It is due by ${due.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}.`
+        : 'No service standard applies to this stage.';
+  }
   if (!enriched.approvalDate) {
     enriched.approvalDate = new Date().toLocaleDateString('en-IN', {
       day: '2-digit',

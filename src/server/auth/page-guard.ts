@@ -1,7 +1,6 @@
 import 'server-only';
 import { cache } from 'react';
 import { redirect } from 'next/navigation';
-import { prisma } from '@/server/db/prisma';
 import { getAuthUser, can, type AuthUser } from './context';
 import type { Capability } from '@/lib/constants';
 
@@ -28,14 +27,10 @@ export type PageUser = AuthUser & { roleNames: string[] };
  */
 export const requirePageUser = cache(async function requirePageUser(): Promise<PageUser> {
   const user = await getAuthUser();
-  if (!user) redirect('/login');
-
-  const roles = await prisma.role.findMany({
-    where: { key: { in: user.roleKeys } },
-    select: { name: true },
-  });
-
-  return { ...user, roleNames: roles.map((r) => r.name) };
+  // `session=ended` tells the middleware to clear the cookies: a token whose
+  // session is gone still verifies at the edge and would otherwise loop.
+  if (!user) redirect('/login?session=ended');
+  return user as PageUser;
 });
 
 /**

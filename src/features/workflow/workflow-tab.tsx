@@ -22,6 +22,7 @@ import { EmptyState } from '@/components/common/empty-state';
 import { toast } from '@/components/ui/toast';
 import { api, ApiCallError } from '@/features/applications/api';
 import { priorityLabel, slaLabel, stageName, daysBetween } from '@/lib/workflow';
+import { SlaPanel } from './sla-panel';
 import { isShortfallOpen } from '@/lib/shortfalls';
 import { statusMeta } from '@/lib/status';
 import { cn } from '@/lib/utils';
@@ -160,6 +161,18 @@ export function WorkflowTab({
   const { stage, task } = state;
   const openShortfalls = shortfalls.filter((s) => isShortfallOpen(s.status));
 
+  /**
+   * The desk this file goes to next if it is sent on.
+   *
+   * Read off the engine's own action list rather than from any table in this
+   * component. `getWorkflowState` resolves the available actions from
+   * `workflow_transitions`, and each carries the stage it leads to — so this
+   * line says "Planning Officer" under BBAS_STANDARD and "ZAD/ZDD" under the
+   * extended chain without knowing that either exists. A desk with no onward
+   * action, or a terminal one, simply has no next desk to name.
+   */
+  const onward = state.actions.find((a) => a.kind === 'FORWARD' && a.toStageName);
+
   return (
     <div className="space-y-5">
       {/* ── Where it is ───────────────────────────────────────────────────── */}
@@ -181,6 +194,13 @@ export function WorkflowTab({
                   ? `At this desk for ${daysBetween(task.receivedAt)} ${daysBetween(task.receivedAt) === 1 ? 'day' : 'days'}.`
                   : 'No task is open on this application.'}
             </CardDescription>
+            {!stage?.isTerminal && onward && (
+              <p className="mt-1 flex items-center gap-1.5 text-caption text-text-muted">
+                <span>Next desk</span>
+                <ArrowRight className="size-3" aria-hidden="true" />
+                <span className="font-medium text-text">{onward.toStageName}</span>
+              </p>
+            )}
           </div>
 
           {task && (
@@ -235,6 +255,8 @@ export function WorkflowTab({
               )}
             </div>
 
+            <SlaPanel sla={task.sla} />
+
             {canClaim && task.mine && (
               <div className="flex gap-2">
                 {task.assignedUserId === currentUserId ? (
@@ -277,7 +299,13 @@ export function WorkflowTab({
                           ? 'destructive'
                           : 'secondary'
                     }
-                    onClick={() => setOpen(action)}
+                    onClick={() =>
+                      action.inspection
+                        ? router.replace(`/applications/${applicationId}?tab=inspection`, { scroll: false })
+                        : action.proceeding
+                          ? router.replace(`/applications/${applicationId}?tab=proceedings`, { scroll: false })
+                          : setOpen(action)
+                    }
                   >
                     {action.label}
                     {action.toStageCode && action.kind !== 'REJECT' && <ArrowRight />}

@@ -36,7 +36,7 @@ import { badRequest, tooLarge } from '@/server/http/errors';
 
 export type StoreUploadInput = {
   applicationId: string;
-  kind: 'drawings' | 'documents' | 'reports';
+  kind: 'drawings' | 'bim' | 'documents' | 'reports' | 'inspections' | 'nocs' | 'proceedings' | 'commencements' | 'occupancy';
   file: {
     name: string;
     type: string;

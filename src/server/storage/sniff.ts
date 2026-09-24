@@ -21,7 +21,7 @@ import 'server-only';
  * returning "probably fine".
  */
 
-export type SniffedKind = 'pdf' | 'dwg' | 'dxf' | 'png' | 'jpeg' | 'zip' | null;
+export type SniffedKind = 'pdf' | 'dwg' | 'dxf' | 'ifc' | 'png' | 'jpeg' | 'zip' | null;
 
 const startsWith = (buf: Buffer, bytes: number[], offset = 0): boolean =>
   buf.length >= offset + bytes.length && bytes.every((b, i) => buf[offset + i] === b);
@@ -49,6 +49,10 @@ export function sniff(buf: Buffer): SniffedKind {
   ) {
     return 'zip';
   }
+
+  // IFC (and any STEP physical file): "ISO-10303-21;" at the very start,
+  // optionally after a UTF-8 byte-order mark or whitespace.
+  if (/^(\uFEFF)?\s*ISO-10303-21;/.test(buf.subarray(0, 64).toString('utf8'))) return 'ifc';
 
   // Binary DXF: "AutoCAD Binary DXF\r\n\x1a\x00"
   if (buf.subarray(0, 18).toString('binary') === 'AutoCAD Binary DXF') return 'dxf';
@@ -86,7 +90,13 @@ const DECLARED_TO_KINDS: Record<string, SniffedKind[]> = {
   'image/jpg': ['jpeg'],
   'application/zip': ['zip'],
   'application/x-zip-compressed': ['zip'],
-  'application/octet-stream': ['pdf', 'dwg', 'dxf', 'png', 'jpeg', 'zip'],
+  'application/octet-stream': ['pdf', 'dwg', 'dxf', 'ifc', 'png', 'jpeg', 'zip'],
+  // Browsers mostly send .ifc as octet-stream or text/plain; the sniff decides.
+  'application/x-step': ['ifc'],
+  'model/ifc': ['ifc'],
+  'application/ifc': ['ifc'],
+  'text/plain': ['ifc'],
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['zip'],
   'image/vnd.dwg': ['dwg'],
   'image/x-dwg': ['dwg'],
   'application/acad': ['dwg'],
@@ -109,6 +119,13 @@ const EXTENSION_TO_KINDS: Record<string, SniffedKind[]> = {
   jpg: ['jpeg'],
   jpeg: ['jpeg'],
   zip: ['zip'],
+  ifc: ['ifc'],
+  // Zip containers by another name: a compressed IFC, a BCF issue set and a
+  // COBie workbook are all PK archives.
+  ifczip: ['zip'],
+  bcf: ['zip'],
+  bcfzip: ['zip'],
+  xlsx: ['zip'],
 };
 
 export type ContentCheck =
@@ -134,7 +151,7 @@ export function checkContent(
     return {
       ok: false,
       reason:
-        'That file could not be recognised as a PDF or a CAD drawing. It may be corrupt, ' +
+        'That file could not be recognised as a PDF, a CAD drawing or an IFC model. It may be corrupt, ' +
         'or saved in a format this system does not accept.',
     };
   }
@@ -172,6 +189,7 @@ const DESCRIPTIONS: Record<NonNullable<SniffedKind>, string> = {
   pdf: 'a PDF',
   dwg: 'a DWG drawing',
   dxf: 'a DXF drawing',
+  ifc: 'an IFC model',
   png: 'a PNG image',
   jpeg: 'a JPEG image',
   zip: 'a ZIP archive',
@@ -185,6 +203,7 @@ export const canonicalMime = (kind: NonNullable<SniffedKind>): string =>
     pdf: 'application/pdf',
     dwg: 'image/vnd.dwg',
     dxf: 'image/vnd.dxf',
+    ifc: 'application/x-step',
     png: 'image/png',
     jpeg: 'image/jpeg',
     zip: 'application/zip',

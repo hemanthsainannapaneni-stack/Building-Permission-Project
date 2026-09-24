@@ -1,7 +1,7 @@
 import 'server-only';
 import { prisma } from '@/server/db/prisma';
 import { audit } from './audit';
-import { badRequest, conflict, notFound, businessRule } from '@/server/http/errors';
+import { badRequest, conflict, notFound } from '@/server/http/errors';
 import type { AuthUser } from '@/server/auth/context';
 
 type Meta = { ip?: string; userAgent?: string; correlationId?: string };
@@ -60,7 +60,9 @@ export async function createNotificationTemplate(
         channel: input.channel,
         subject: input.subject ?? '',
         body: input.body,
-        providerTemplateId: input.providerTemplateId ?? null,
+        // The column is NOT NULL with an empty default — "no provider template"
+        // is the empty string here, not a null.
+        providerTemplateId: input.providerTemplateId ?? '',
         isActive: true,
       },
       select: TEMPLATE_SELECT,

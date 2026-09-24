@@ -21,6 +21,31 @@ export type ActionOption = {
   reason: string;
   guards: Array<{ name: string; passed: boolean; message: string }>;
   shortfall: { kind: string; mode: string } | null;
+  /**
+   * Present for the site inspection actions. Booking needs an inspector and a
+   * date, submitting needs 27 answers, photographs and a signature — so these
+   * are a pointer to the Site Inspection tab, never the generic modal.
+   */
+  inspection?: { step: string } | null;
+  /** Show cause / revocation actions: a pointer to the Proceedings tab, never the generic modal. */
+  proceeding?: { module: string; step: string } | null;
+};
+
+/** The service-standard clock on the open task, as the client sees it. */
+export type SlaClockView = {
+  startedAt: string;
+  targetDays: number | null;
+  calendar: string;
+  dueAt: string;
+  elapsedDays: number;
+  remainingDays: number;
+  status: string;
+  percent: number;
+  isPaused: boolean;
+  isDueSoon: boolean;
+  isOverdue: boolean;
+  overdueDays: number;
+  escalatesTo: string | null;
 };
 
 export type WorkflowState = {
@@ -44,6 +69,7 @@ export type WorkflowState = {
     priority: number;
     dueAt: string | null;
     slaStatus: string | null;
+    sla: SlaClockView | null;
     mine: boolean;
   } | null;
   actions: ActionOption[];

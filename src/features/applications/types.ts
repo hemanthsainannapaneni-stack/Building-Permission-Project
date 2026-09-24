@@ -47,6 +47,13 @@ export type ApplicationDetail = ApplicationRow & {
   ltpUserId: string;
   zoneId: string | null;
   purpose: string;
+  /** The BBAS general-information classification. See src/lib/bbas-fields.ts. */
+  caseType: string;
+  permissionType: string;
+  natureOfPermission: string;
+  landType: string;
+  lpsStatus: string;
+  riskCategory: string;
   approvedAt: string | null;
   rejectedAt: string | null;
   ltpDeclaredAt: string | null;
@@ -83,6 +90,14 @@ export type ApplicantRecord = {
   ownerName: string;
   ownerPhone: string;
   ownerAddress: string;
+  developerName: string;
+  developerPhone: string;
+  developerRegistrationNo: string;
+  structuralEngineerName: string;
+  structuralEngineerPhone: string;
+  structuralEngineerRegNo: string;
+  professionalRegistrationRef: string;
+  usagePurpose: string;
 };
 
 export type PropertyRecord = {
@@ -108,6 +123,46 @@ export type PropertyRecord = {
   boundarySouth: string;
   boundaryEast: string;
   boundaryWest: string;
+
+  // BBAS location
+  gramPanchayat: string;
+  township: string;
+  sector: string;
+  colony: string;
+  natureOfSite: string;
+  blockNo: string;
+  rsNo: string;
+  zoningDistrict: string;
+  roadName: string;
+
+  // The plot-area chain. Null means not entered — see src/lib/plot-area.ts.
+  documentAreaSqm: number | null;
+  groundAreaSqm: number | null;
+  grossPlotAreaSqm: number | null;
+  roadWideningDeductionSqm: number | null;
+  greenBufferDeductionSqm: number | null;
+  surrenderGiftAreaSqm: number | null;
+  netPlotAreaSqm: number | null;
+  tdrAreaSqm: number | null;
+  marketValue: number | null;
+  irr: string;
+  hasExistingConstruction: boolean;
+  existingConstruction: string;
+
+  // Constraints
+  religiousStructureNearby: boolean;
+  religiousStructureDistanceM: number | null;
+  aerodromeNearby: boolean;
+  aerodromeDistanceM: number | null;
+  waterBodyNearby: boolean;
+  waterBodyDistanceM: number | null;
+  railwayNearby: boolean;
+  railwayDistanceM: number | null;
+  htLineNearby: boolean;
+  htLineDistanceM: number | null;
+  monumentNearby: boolean;
+  monumentDistanceM: number | null;
+  constraintRemarks: string;
 };
 
 export type BuildingRecord = {
@@ -115,6 +170,7 @@ export type BuildingRecord = {
   buildingSubUse: string;
   occupancyType: string;
   structureType: string;
+  proposedActivity: string;
   numFloors: number;
   numBasements: number;
   numDwellingUnits: number;

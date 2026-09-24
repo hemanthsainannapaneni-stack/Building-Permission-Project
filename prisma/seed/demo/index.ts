@@ -7,7 +7,13 @@ import { makeRng } from './rng';
 import { BUILDING_PROFILES } from './dataset';
 import { PLAN, PLANNED_TOTAL, planItems, type Stop } from './plan';
 import { seedDemoStaff } from './users';
-import { buildApplication, META as META_SEED, type Actor, type JourneyContext } from './journey';
+import {
+  buildApplication,
+  META as META_SEED,
+  type Actor,
+  type JourneyContext,
+  type JourneyResult,
+} from './journey';
 import { backdateApplication, backdateFileObjects, withTriggersDisabled } from './backdate';
 
 /**
@@ -66,6 +72,9 @@ const TRUNCATE_TABLES = [
   'application_events',
   'drawings',
   'drawing_versions',
+  'bim_submissions',
+  'bim_models',
+  'bim_model_versions',
   'scrutiny_requests',
   'scrutiny_results',
   'scrutiny_issues',
@@ -93,6 +102,7 @@ const TRUNCATE_TABLES = [
   'outbox_events',
   'jobs',
   'number_sequences',
+  'audit_logs',
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -230,6 +240,7 @@ async function actorFor(email: string): Promise<Actor> {
     name: user.name,
     email: user.email,
     roleKeys,
+    roleNames: user.roles.map((r) => r.role.name),
     capabilities: [...new Set(roleKeys.flatMap((key) => RBAC_MATRIX[key] as unknown as string[]))],
     zoneIds,
     officeId: user.officeId,
@@ -361,16 +372,16 @@ async function main() {
 
   const officers = await Promise.all(
     [
+      // The BBAS_STANDARD desks. Between them every zone Z1–Z5 has a TPA,
+      // a Planning Officer, a ZDD and a ZJD — officerFor() throws otherwise.
       'tpa.demo@example.com',
       'tpa2.demo@example.com',
-      'zad.demo@example.com',
-      'zad2.demo@example.com',
+      'po.demo@example.com',
+      'po2.demo@example.com',
       'zdd.demo@example.com',
+      'zdd2.demo@example.com',
       'zjd.demo@example.com',
       'zjd2.demo@example.com',
-      'director.demo@example.com',
-      'addlcommissioner.demo@example.com',
-      'commissioner.demo@example.com',
     ].map(actorFor)
   );
 
@@ -429,7 +440,7 @@ async function main() {
   const items = planItems().sort((a, b) => {
     const rank = (s: Stop) => (s === 'SCRUTINY_QUEUED' ? 1 : 0);
     return rank(a.stop) - rank(b.stop);
-  }).slice(0, 15); // REDUCED TO 15 TO AVOID DB TIMEOUTS
+  });
 
   console.log(`  Building    ${items.length} applications through the real services…`);
 
@@ -458,14 +469,29 @@ async function main() {
 
     const t0 = new Date();
 
-    const result = await buildApplication(ctx, {
-      stop: item.stop,
-      ageDays,
-      ltp: ltps[i % ltps.length]!,
-      applicationType: type,
-      zone,
-      profile: rng.pick(BUILDING_PROFILES),
-    });
+    let result: JourneyResult | null = null;
+    let attempts = 0;
+    while (!result && attempts < 3) {
+      attempts += 1;
+      try {
+        result = await buildApplication(ctx, {
+          stop: item.stop,
+          ageDays,
+          ltp: ltps[i % ltps.length]!,
+          applicationType: type,
+          zone,
+          profile: rng.pick(BUILDING_PROFILES),
+        });
+      } catch (err) {
+        if (attempts >= 3) {
+          console.error(`\n  [WARN] Failed application ${i + 1} (${item.stop}) after 3 attempts:`, (err as Error).message);
+          break;
+        }
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
+
+    if (!result) continue;
 
     const t1 = new Date();
 
@@ -486,9 +512,11 @@ async function main() {
       end: new Date(now - idleDays * 86_400_000),
     });
 
-    if ((i + 1) % 10 === 0) {
+    if ((i + 1) % 5 === 0 || i + 1 === items.length) {
       process.stdout.write(`              ${i + 1}/${items.length}\n`);
     }
+    
+    await new Promise(r => setTimeout(r, 100));
   }
 
   // ── The runs that are meant to still be queued ────────────────────────
@@ -553,6 +581,32 @@ async function main() {
     const entry = built.find((b) => b.id === item.id);
     if (entry) entry.status = row.status;
   }
+
+  // Files that stopped before their drawings (drafts, bare submissions) never
+  // reached the journey's BIM step. The backfill gives them a model too, so
+  // every application in the demo has a BIM tab with something on it.
+  const { backfillBim } = await import('./bim');
+  await backfillBim(prisma, { apply: true, log: (line) => console.log(`  BIM       ${line.trim()}`) });
+
+  // Phase 7: show cause, revocation and outward examples on the files built
+  // above, through the real services. Adds to the plan's files; never builds one.
+  const { seedProceedings } = await import('./proceedings');
+  await seedProceedings(prisma, { apply: true, log: (line) => console.log(`  Proceed.  ${line.trim()}`) });
+
+  // Phase 8: change of technical professional examples — pending, under
+  // review, approved, rejected — through the real service and workflow.
+  const { seedProfessionalChanges } = await import('./professional-changes');
+  await seedProfessionalChanges(prisma, { apply: true, log: (line) => console.log(`  TP chg.   ${line.trim()}`) });
+
+  // Phase 9: commencement of work — work initiated, pending commencement, and
+  // files left at "proceeding issued" — through the real service and workflow.
+  const { seedWorkCommencements } = await import('./work-commencements');
+  await seedWorkCommencements(prisma, { apply: true, log: (line) => console.log(`  Work init ${line.trim()}`) });
+
+  // Phase 10: occupancy — every state from completion pending to certificate
+  // issued — through the real services and workflow.
+  const { seedOccupancy } = await import('./occupancy');
+  await seedOccupancy(prisma, { apply: true, log: (line) => console.log(`  Occupancy ${line.trim()}`) });
 
   await writeManifest({
     version: MANIFEST_VERSION,

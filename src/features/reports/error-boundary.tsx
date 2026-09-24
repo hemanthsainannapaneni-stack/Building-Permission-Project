@@ -1,5 +1,6 @@
 'use client';
 import React, { Component, ReactNode } from 'react';
+import { ErrorState } from '@/components/common/error-state';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -20,18 +21,21 @@ export class ReportsErrorBoundary extends Component<ErrorBoundaryProps, ErrorBou
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  override componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    // The detail goes to the console, where a developer can read it. It does
+    // not go on the page: a stack trace tells the officer looking at Reports
+    // nothing they can act on, and names our internals to anyone watching.
     console.error('Reports Error Boundary caught an error:', error, errorInfo);
   }
 
-  render() {
+  override render() {
     if (this.state.hasError) {
       return (
-        <div className="p-6 bg-red-50 text-red-900 border border-red-200 rounded-lg">
-          <h2 className="text-xl font-bold mb-4">Client Render Error in Reports</h2>
-          <pre className="whitespace-pre-wrap">{this.state.error?.message}</pre>
-          <pre className="whitespace-pre-wrap mt-4 text-xs">{this.state.error?.stack}</pre>
-        </div>
+        <ErrorState
+          title="Reports did not load"
+          description="Something went wrong while rendering this page. Reloading usually clears it; if it does not, the detail is in the browser console."
+          onRetry={() => this.setState({ hasError: false, error: null })}
+        />
       );
     }
 

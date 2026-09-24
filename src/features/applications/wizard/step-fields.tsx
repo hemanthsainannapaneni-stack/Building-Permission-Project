@@ -8,7 +8,11 @@ import { Field } from '@/components/ui/field';
 import { CheckboxField } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { DataStepKey } from '@/lib/schemas/applications';
+import { WIZARD_REQUIRES_FIELDS_TO_ADVANCE } from '@/lib/application-steps';
 import type { ApplicationMeta } from '../types';
+
+/** The required marker, shown only while Next enforces it — see WIZARD_REQUIRES_FIELDS_TO_ADVANCE. */
+const marked = (required?: boolean) => WIZARD_REQUIRES_FIELDS_TO_ADVANCE && Boolean(required);
 
 /**
  * The fields of every wizard step.
@@ -95,7 +99,7 @@ function Text({
 }) {
   const error = errorOf(form, name);
   return (
-    <Field label={label} htmlFor={name} error={error} hint={hint} required={required} className={className}>
+    <Field label={label} htmlFor={name} error={error} hint={hint} required={marked(required)} className={className}>
       <Input
         type={type}
         inputMode={inputMode}
@@ -146,7 +150,7 @@ function Num({
       htmlFor={name}
       error={error}
       hint={hint}
-      required={required}
+      required={marked(required)}
       className={className}
     >
       <Input
@@ -185,7 +189,7 @@ function Area({
 }) {
   const error = errorOf(form, name);
   return (
-    <Field label={label} htmlFor={name} error={error} hint={hint} required={required} className={className}>
+    <Field label={label} htmlFor={name} error={error} hint={hint} required={marked(required)} className={className}>
       <Textarea rows={rows} placeholder={placeholder} invalid={Boolean(error)} {...form.register(name)} />
     </Field>
   );
@@ -234,7 +238,7 @@ function Choice({
   }
 
   return (
-    <Field label={label} htmlFor={name} error={error} hint={hint} required={required} className={className}>
+    <Field label={label} htmlFor={name} error={error} hint={hint} required={marked(required)} className={className}>
       <Controller
         control={form.control}
         name={name}

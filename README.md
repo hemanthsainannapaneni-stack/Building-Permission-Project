@@ -268,6 +268,17 @@ in the dashboard code that a reader could mistake for data.
 | **Scrutiny UI** | Outcome banner, check tally, blocking issues separated from advisories, a plain-language remedy inside each finding, and the downloadable report. Polls only while a run is in flight. |
 | **Configurable gate** | `applicationType.requiresScrutiny = false` skips the engine entirely and moves straight to documents. Configuration, not a code path. |
 
+### BIM — the building information model
+
+| | |
+|---|---|
+| **Model files** | The **BIM** tab, beside Drawings, takes the federated IFC model (`.ifc` / `.ifczip`, ISO 16739), discipline models, BCF clash sets, COBie and the BIM Execution Plan — through the same upload pipeline, versioned the same way (`bim_model_one_active`). |
+| **Read from the bytes** | On upload the server reads the IFC itself (`src/server/bim/ifc.ts`): schema, model view definition, authoring tool, units, storeys and elevations, spaces, element counts, `IfcMapConversion` and the site's latitude/longitude. Those facts fill any particular the LTP left blank — never one they answered. |
+| **Particulars** | Model identity (authoring, schema, MVD, LOD, classification, disciplines), georeferencing (EPSG CRS, datum, origin, true north), the model's own quantities and level schedule, a model-content checklist, coordination (clash detection, IFC validation), ISO 19650 information management and the answerable BIM manager. |
+| **Reconciliation** | What the application declares beside what the model reports — plot, BUA, FAR floor area, FAR, coverage, height, floors, basements, units, four setbacks — each with a stated tolerance. Thirteen readiness checks in `src/lib/bim.ts`, shared by screen and server. |
+| **Declaration and review** | The LTP declares a specific model; a new version or any changed particular withdraws it. A departmental desk (`CHECKLIST_REVIEW`) accepts the model or returns it with remarks the LTP sees. |
+| **Existing files** | `npm run bim:backfill -- --apply` gives every application without one a georeferenced IFC4 model of its declared building and the particulars to go with it. Idempotent; `seed:demo` runs it at the end. |
+
 ### Phase 2 — LTP application management
 
 | | |

@@ -6,6 +6,7 @@ export type LogQuery = {
   status?: string;
   eventCode?: string;
   query?: string;
+  applicationId?: string;
   page?: number;
   pageSize?: number;
 };
@@ -19,6 +20,7 @@ export async function listNotificationLogs(params: LogQuery = {}) {
     channel?: string;
     status?: string;
     eventCode?: string;
+    applicationId?: string;
     OR?: Array<{ recipient?: { contains: string }; body?: { contains: string } }>;
   } = {};
 
@@ -39,6 +41,10 @@ export async function listNotificationLogs(params: LogQuery = {}) {
     where.OR = [{ recipient: { contains: q } }, { body: { contains: q } }];
   }
 
+  if (params.applicationId) {
+    where.applicationId = params.applicationId;
+  }
+
   const [logs, total, stats] = await Promise.all([
     prisma.notificationLog.findMany({
       where,
@@ -50,6 +56,7 @@ export async function listNotificationLogs(params: LogQuery = {}) {
         channel: true,
         eventCode: true,
         recipient: true,
+        recipientUserId: true,
         subject: true,
         body: true,
         status: true,
@@ -58,6 +65,13 @@ export async function listNotificationLogs(params: LogQuery = {}) {
         errorMessage: true,
         sentAt: true,
         createdAt: true,
+        applicationId: true,
+        // The template that produced it. Named so an administrator reading a
+        // badly-worded message can go and change the thing that wrote it,
+        // rather than working backwards from the event code.
+        template: { select: { id: true, eventCode: true, channel: true, subject: true } },
+        recipientUser: { select: { name: true } },
+        application: { select: { applicationNumber: true } },
       },
     }),
     prisma.notificationLog.count({ where }),
@@ -78,21 +92,57 @@ export async function listNotificationLogs(params: LogQuery = {}) {
     statusCounts[s.status] = s._count._all;
   }
 
+  // ── Read receipts, for the in-app rows only ──────────────────────────
+  //
+  // The in-app provider stores the Notification id it created in
+  // `providerRef`, so the read state can be joined on it without carrying a
+  // second foreign key. Email and SMS have no read receipt and never will —
+  // those rows report `null`, which is the honest answer, rather than `false`,
+  // which would claim the recipient had not read something we cannot know.
+  const inAppRefs = logs
+    .filter((log) => log.channel === 'IN_APP' && log.providerRef)
+    .map((log) => log.providerRef);
+
+  const readState = new Map<string, { isRead: boolean; readAt: Date | null }>();
+
+  if (inAppRefs.length) {
+    const rows = await prisma.notification.findMany({
+      where: { id: { in: inAppRefs } },
+      select: { id: true, isRead: true, readAt: true },
+    });
+    for (const row of rows) readState.set(row.id, { isRead: row.isRead, readAt: row.readAt });
+  }
+
   return {
-    logs: logs.map((log) => ({
-      id: log.id,
-      channel: log.channel,
-      eventCode: log.eventCode,
-      recipient: log.recipient,
-      subject: log.subject,
-      body: log.body,
-      status: log.status,
-      provider: log.provider,
-      providerRef: log.providerRef,
-      errorMessage: log.errorMessage,
-      sentAt: log.sentAt ? log.sentAt.toISOString() : null,
-      createdAt: log.createdAt.toISOString(),
-    })),
+    logs: logs.map((log) => {
+      const read = log.channel === 'IN_APP' ? (readState.get(log.providerRef) ?? null) : null;
+
+      return {
+        id: log.id,
+        channel: log.channel,
+        eventCode: log.eventCode,
+        recipient: log.recipient,
+        recipientName: log.recipientUser?.name ?? '',
+        subject: log.subject,
+        body: log.body,
+        status: log.status,
+        provider: log.provider,
+        providerRef: log.providerRef,
+        errorMessage: log.errorMessage,
+        sentAt: log.sentAt ? log.sentAt.toISOString() : null,
+        createdAt: log.createdAt.toISOString(),
+        applicationId: log.applicationId,
+        applicationNumber: log.application?.applicationNumber ?? '',
+        templateId: log.template?.id ?? null,
+        /** The template that produced it, named as an administrator sees it. */
+        templateName: log.template
+          ? `${log.template.eventCode} · ${log.template.channel}`
+          : 'Built-in fallback',
+        /** Null on a channel that cannot report a read receipt. */
+        isRead: read ? read.isRead : null,
+        readAt: read?.readAt ? read.readAt.toISOString() : null,
+      };
+    }),
     total,
     page,
     pageSize,

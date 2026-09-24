@@ -3,7 +3,7 @@ import { hashPassword } from '../../src/server/auth/password';
 import { ROLES, type RoleKey } from '../../src/lib/constants';
 
 /**
- * The eleven demo accounts.
+ * The twelve demo accounts — one per desk.
  *
  * All share one password, read from DEMO_PASSWORD (default `Demo@12345`) and
  * documented in the README. They exist so a tester can walk the whole
@@ -44,6 +44,19 @@ export const DEMO_USERS: DemoUser[] = [
     officeCode: 'TP-Z1',
     zoneCodes: ['Z1', 'Z2'],
     phone: '9000000002',
+  },
+  {
+    // The BBAS chain's second desk. Zoned like the other zonal officers rather
+    // than given every zone: jurisdiction scoping is a real guarantee, and an
+    // officer who can see everything makes it invisible. Z4 and Z5 are covered
+    // by po2.demo in the demo staff seed, so every zone has a Planning Officer.
+    email: 'po.demo@example.com',
+    name: 'Ananya Krishnan',
+    role: ROLES.PLANNING_OFFICER,
+    designation: 'Planning Officer',
+    officeCode: 'TP-Z1',
+    zoneCodes: ['Z1', 'Z2', 'Z3'],
+    phone: '9000000013',
   },
   {
     email: 'zad.demo@example.com',
@@ -147,7 +160,7 @@ export async function seedUsers(prisma: PrismaClient, demoPassword: string) {
 
   for (const demo of DEMO_USERS) {
     const office = await prisma.office.findUniqueOrThrow({ where: { code: demo.officeCode } });
-    const roles = demo.email === 'super.demo@example.com'
+    const roles = demo.email === 'super.demo@example.com' || demo.email === 'admin.demo@example.com'
       ? await prisma.role.findMany()
       : [await prisma.role.findUniqueOrThrow({ where: { key: demo.role } })];
 
@@ -196,7 +209,7 @@ export async function seedUsers(prisma: PrismaClient, demoPassword: string) {
     }
 
     // Jurisdictions, re-synced so removing a zone here removes it there.
-    const zoneIds = demo.email === 'super.demo@example.com'
+    const zoneIds = demo.email === 'super.demo@example.com' || demo.email === 'admin.demo@example.com'
       ? (await prisma.zone.findMany()).map(z => z.id)
       : await Promise.all(
           demo.zoneCodes.map(async (code) => (await prisma.zone.findUniqueOrThrow({ where: { code } })).id)

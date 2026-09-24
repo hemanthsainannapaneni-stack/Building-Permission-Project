@@ -1,7 +1,7 @@
 import 'server-only';
 import { prisma } from '@/server/db/prisma';
 import { audit } from './audit';
-import { badRequest, conflict, notFound, businessRule } from '@/server/http/errors';
+import { conflict, notFound, businessRule } from '@/server/http/errors';
 import type { AuthUser } from '@/server/auth/context';
 
 type Meta = { ip?: string; userAgent?: string; correlationId?: string };

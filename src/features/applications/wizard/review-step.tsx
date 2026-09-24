@@ -1,7 +1,16 @@
 'use client';
 
 import * as React from 'react';
-import { ChevronLeft, ChevronRight, CircleCheck, Pencil, TriangleAlert } from 'lucide-react';
+import Link from 'next/link';
+import {
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  CircleCheck,
+  ClipboardList,
+  Pencil,
+  TriangleAlert,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { WIZARD_STEPS } from '@/lib/application-steps';
@@ -93,6 +102,45 @@ export function ReviewStep({
               </div>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/*
+        ── The 19-point checklist ───────────────────────────────────────
+        The checklist is answered on the application's own Checklist tab
+        rather than as a wizard step, and this card is the bridge.
+
+        A step of its own was the obvious alternative and is the wrong shape:
+        the checklist is answered AGAIN after filing — whenever a desk returns
+        the file — while every wizard step is by definition something you do
+        once, before the file exists. Making it a step would have meant either
+        a step that reopens after submission, or two different screens for the
+        same nineteen questions.
+
+        It is left OUT of the filing preconditions on purpose. Nothing in the
+        BBAS manuals supplied says an unanswered checklist blocks filing, and
+        the wording is provisional besides — refusing to accept an application
+        on the strength of a sentence this system wrote itself would be the
+        wrong way round.
+      */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ClipboardList className="size-4 text-text-muted" aria-hidden />
+            Application checklist
+          </CardTitle>
+          <CardDescription>
+            The 19-point checklist the department verifies this application against. You can answer
+            it now, and again if the file is returned to you.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button asChild variant="secondary" size="sm">
+            <Link href={`/applications/${application.id}?tab=checklist`}>
+              Open the checklist
+              <ArrowRight className="size-4" aria-hidden />
+            </Link>
+          </Button>
         </CardContent>
       </Card>
 

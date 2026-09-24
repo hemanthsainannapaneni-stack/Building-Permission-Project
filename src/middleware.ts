@@ -32,6 +32,14 @@ const PUBLIC_API = [
   '/api/health',
   '/api/cron',
   /*
+   * Public permission verification. No session exists and none is wanted: the
+   * whole point is that a bank clerk or a buyer's advocate can check a
+   * permission without an account. What may be read is fixed by a whitelist in
+   * `src/server/services/public-verification.ts`, and the route is rate
+   * limited by IP so the endpoint cannot be used to enumerate the register.
+   */
+  '/api/public',
+  /*
    * Payment gateway callbacks. A gateway has no session with us and never
    * will, so a 401 here would silently break every integration — the gateway
    * would retry for hours and the department would find out when an applicant
@@ -97,6 +105,17 @@ export async function middleware(req: NextRequest) {
   // sign in again instead of looping forever.
   if (accessToken && !hasValidAccessToken) {
     const response = NextResponse.redirect(new URL('/login', req.url));
+    response.cookies.delete(ACCESS_COOKIE);
+    response.cookies.delete(REFRESH_COOKIE);
+    return response;
+  }
+
+  // The server-side auth layer found the token's session gone (revoked,
+  // expired, or from another database) and sent the user here. The signature
+  // still verifies, so without this the check below would bounce them straight
+  // back to /dashboard and loop. Drop the cookies and show the sign-in page.
+  if (pathname === '/login' && req.nextUrl.searchParams.get('session') === 'ended') {
+    const response = NextResponse.next();
     response.cookies.delete(ACCESS_COOKIE);
     response.cookies.delete(REFRESH_COOKIE);
     return response;

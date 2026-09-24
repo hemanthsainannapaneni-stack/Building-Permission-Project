@@ -145,3 +145,18 @@ export const isEditableStatus = (status: string): boolean => EDITABLE_STATUSES.h
 
 /** Statuses from which nothing further happens. Mirrors TERMINAL_STATUSES. */
 export const isSubmittedStatus = (status: string): boolean => status !== 'DRAFT';
+
+/**
+ * TEMPORARY (demo): whether Next refuses to leave a step until it validates.
+ *
+ * Off: Next saves the step properly when it validates and, when it does not,
+ * keeps what was typed as a draft (`application_drafts.scratch`) and moves on
+ * anyway — every step can be walked through to Review and Submit with any
+ * field left blank. Required-field markers are hidden to match.
+ *
+ * Nothing else is relaxed. The server still validates each step before
+ * writing it to the real tables, and Submit still refuses to file an
+ * application with anything missing, listing what is. Set back to `true` to
+ * restore the original behaviour.
+ */
+export const WIZARD_REQUIRES_FIELDS_TO_ADVANCE = false;

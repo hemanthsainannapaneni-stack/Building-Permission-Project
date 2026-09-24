@@ -46,6 +46,9 @@ const ICONS: Record<string, { icon: LucideIcon; tone: string }> = {
   APPLICATION_DELETED: { icon: Trash2, tone: 'text-danger' },
 
   DRAWING_UPLOADED: { icon: Upload, tone: 'text-info' },
+  BIM_MODEL_UPLOADED: { icon: Upload, tone: 'text-info' },
+  BIM_DECLARED: { icon: CircleCheck, tone: 'text-success' },
+  BIM_REVIEWED: { icon: ScanSearch, tone: 'text-info' },
   SCRUTINY_STARTED: { icon: ScanSearch, tone: 'text-info' },
   SCRUTINY_PASSED: { icon: CircleCheck, tone: 'text-success' },
   SCRUTINY_FAILED: { icon: CircleX, tone: 'text-danger' },

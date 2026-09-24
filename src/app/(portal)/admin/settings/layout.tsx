@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { PageHeader } from '@/components/common/page-header';
 import { cn } from '@/lib/utils';
-import { Users, Shield, Building2, FileText, Settings2, SlidersHorizontal, MessageSquare } from 'lucide-react';
+import { Users, Shield, Building2, FileText, Settings2, SlidersHorizontal, MessageSquare, ListChecks } from 'lucide-react';
 
 const TABS = [
   { label: 'Overview', href: '/admin/settings/overview', icon: SlidersHorizontal },
@@ -14,6 +14,8 @@ const TABS = [
   { label: 'Roles', href: '/admin/settings/roles', icon: Shield },
   { label: 'Organisation', href: '/admin/settings/organisation', icon: Building2 },
   { label: 'Document Types', href: '/admin/settings/document-types', icon: FileText },
+  { label: 'Checklists', href: '/admin/settings/checklists', icon: ListChecks },
+  { label: 'NOC Types', href: '/admin/settings/noc-types', icon: FileText },
   { label: 'System', href: '/admin/settings/system', icon: SlidersHorizontal },
   { label: 'Notifications', href: '/admin/settings/notifications', icon: MessageSquare },
   { label: 'Delivery Logs', href: '/admin/settings/sms-logs', icon: MessageSquare },

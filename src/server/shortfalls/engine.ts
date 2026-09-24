@@ -10,7 +10,9 @@ import { nextSequence, formatNumber } from '@/server/services/numbering';
 import { settingNumber, settingString } from '@/server/services/settings';
 import { createShortfallDemand } from '@/server/services/fees';
 import {
+  ITEM_DECISIONS,
   KIND_META,
+  SHORTFALL_ITEM_STATUS,
   SHORTFALL_STATUS,
   canTransition,
   isShortfallOpen,
@@ -86,7 +88,30 @@ export const SHORTFALL_SELECT = {
       isResolved: true,
       resolvedAt: true,
       displayOrder: true,
+      category: true,
+      requiredAction: true,
+      requiredDocument: true,
+      remarks: true,
+      status: true,
+      isMandatory: true,
       documentType: { select: { code: true, name: true } },
+      responses: {
+        orderBy: { attemptNo: 'asc' },
+        select: {
+          id: true,
+          attemptNo: true,
+          resolutionId: true,
+          response: true,
+          applicantRemarks: true,
+          attachments: true,
+          respondedAt: true,
+          decision: true,
+          reviewedAt: true,
+          reviewRemarks: true,
+          respondedBy: { select: { name: true } },
+          reviewedBy: { select: { name: true } },
+        },
+      },
     },
   },
   resolutions: {
@@ -188,7 +213,16 @@ export type RaiseInput = {
   description: string;
   requiredAction?: string;
   dueDate?: Date | null;
-  items: Array<{ description: string; amount?: number | null; documentTypeId?: string | null }>;
+  items: Array<{
+    description: string;
+    amount?: number | null;
+    documentTypeId?: string | null;
+    category?: string;
+    requiredAction?: string;
+    requiredDocument?: string;
+    remarks?: string;
+    isMandatory?: boolean;
+  }>;
   /** Raise the additional demand alongside it. FEE shortfalls only. */
   withDemand?: boolean;
   now: Date;
@@ -269,6 +303,18 @@ export async function raiseShortfall(tx: Tx, input: RaiseInput): Promise<RaiseRe
           description: item.description.trim(),
           amount: item.amount != null && Number(item.amount) > 0 ? Number(item.amount) : null,
           displayOrder: index,
+          category: (item.category ?? '').trim(),
+          // Falls back to the letter's instruction rather than to nothing: a
+          // line with no action beside it is a line the applicant has to guess
+          // at, and the covering instruction is at least true of every line.
+          requiredAction:
+            (item.requiredAction ?? '').trim() ||
+            (input.requiredAction ?? '').trim() ||
+            (KIND_META[input.kind]?.asks ?? ''),
+          requiredDocument: (item.requiredDocument ?? '').trim(),
+          remarks: (item.remarks ?? '').trim(),
+          status: SHORTFALL_ITEM_STATUS.PENDING,
+          isMandatory: item.isMandatory !== false,
         })),
       },
     },
@@ -333,7 +379,12 @@ export async function raiseShortfall(tx: Tx, input: RaiseInput): Promise<RaiseRe
       status: SHORTFALL_STATUS.RAISED,
       stageCode: input.stageCode,
       dueDate,
-      items: items.map((i) => ({ description: i.description, amount: i.amount ?? null })),
+      items: items.map((i) => ({
+        description: i.description,
+        amount: i.amount ?? null,
+        category: i.category ?? '',
+        isMandatory: i.isMandatory !== false,
+      })),
       demandNumber: demand?.demandNumber ?? null,
     },
     remarks: description,
@@ -424,11 +475,26 @@ export async function markNotified(shortfallId: string, at: Date = new Date()): 
 // Responding
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** One line of the applicant's answer, against the item it answers. */
+export type ItemResponseInput = {
+  itemId: string;
+  response: string;
+  applicantRemarks?: string;
+  attachments?: Array<Record<string, unknown>>;
+};
+
 export type RespondInput = {
   shortfallId: string;
   actor: Actor;
   response: string;
   attachments?: Array<Record<string, unknown>>;
+  /**
+   * Per-item answers. Optional, and that is deliberate: a CLARIFICATION
+   * shortfall has no items to answer line by line, and an applicant who writes
+   * one covering paragraph against a six-item letter has still responded. The
+   * covering `response` is always required; these refine it.
+   */
+  items?: ItemResponseInput[];
   now?: Date;
   meta: Meta;
 };
@@ -461,12 +527,25 @@ export async function submitResolution(tx: Tx, input: RespondInput) {
       raisedAtStageCode: true,
       application: { select: { applicationNumber: true, ltpUserId: true } },
       resolutions: { select: { attemptNo: true } },
+      items: { select: { id: true, description: true, status: true, isResolved: true } },
     },
   });
 
   if (!shortfall) throw notFound('That shortfall could not be found.');
 
   const attemptNo = Math.max(0, ...shortfall.resolutions.map((r) => r.attemptNo)) + 1;
+
+  // Answers are matched to items by id, and an id that is not on this
+  // shortfall is refused rather than ignored. Silently dropping it would let a
+  // response look complete on screen while one line of it went nowhere.
+  const answers = (input.items ?? []).filter((a) => (a.response ?? '').trim().length > 0);
+  const known = new Set(shortfall.items.map((i) => i.id));
+  const stray = answers.find((a) => !known.has(a.itemId));
+  if (stray) {
+    throw businessRule(
+      `One of the answers is against an item that is not part of ${shortfall.shortfallNumber}. Reload the shortfall and try again.`
+    );
+  }
 
   await move(tx, shortfall, SHORTFALL_STATUS.RESOLUTION_SUBMITTED, { respondedAt: now });
 
@@ -482,6 +561,40 @@ export async function submitResolution(tx: Tx, input: RespondInput) {
     select: { id: true, attemptNo: true },
   });
 
+  // ── The lines, where the applicant answered line by line ────────────────
+  //
+  // Appended at this cycle's number, never edited into the previous one. An
+  // item answered in cycle 1 and again in cycle 2 ends up with two rows, which
+  // is what makes the second answer legible AS a second answer.
+  for (const answer of answers) {
+    await tx.shortfallItemResponse.create({
+      data: {
+        itemId: answer.itemId,
+        attemptNo,
+        resolutionId: resolution.id,
+        respondedById: input.actor.id,
+        respondedAt: now,
+        response: answer.response.trim(),
+        applicantRemarks: (answer.applicantRemarks ?? '').trim(),
+        attachments: (answer.attachments ?? []) as never,
+      },
+    });
+  }
+
+  if (answers.length) {
+    // An item that is already settled stays settled — a later response against
+    // an accepted line is recorded, but it does not reopen the officer's
+    // decision.
+    await tx.shortfallItem.updateMany({
+      where: {
+        id: { in: answers.map((a) => a.itemId) },
+        isResolved: false,
+        status: { in: [SHORTFALL_ITEM_STATUS.PENDING, SHORTFALL_ITEM_STATUS.REJECTED] },
+      },
+      data: { status: SHORTFALL_ITEM_STATUS.RESPONDED },
+    });
+  }
+
   await recordEvent(tx, {
     applicationId: shortfall.applicationId,
     type: EVENT_TYPES.SHORTFALL_RESPONDED,
@@ -496,6 +609,7 @@ export async function submitResolution(tx: Tx, input: RespondInput) {
       shortfallNumber: shortfall.shortfallNumber,
       attemptNo,
       attachments: (input.attachments ?? []).length,
+      itemsAnswered: answers.length,
     },
     occurredAt: now,
   });
@@ -507,7 +621,12 @@ export async function submitResolution(tx: Tx, input: RespondInput) {
     entityId: shortfall.id,
     applicationId: shortfall.applicationId,
     before: { status: shortfall.status },
-    after: { status: SHORTFALL_STATUS.RESOLUTION_SUBMITTED, attemptNo, resolutionId: resolution.id },
+    after: {
+      status: SHORTFALL_STATUS.RESOLUTION_SUBMITTED,
+      attemptNo,
+      resolutionId: resolution.id,
+      itemsAnswered: answers.map((a) => a.itemId),
+    },
     remarks: response,
     ...input.meta,
   });
@@ -528,18 +647,38 @@ export async function submitResolution(tx: Tx, input: RespondInput) {
     },
   });
 
-  return { shortfallId: shortfall.id, attemptNo, status: SHORTFALL_STATUS.RESOLUTION_SUBMITTED };
+  return {
+    shortfallId: shortfall.id,
+    attemptNo,
+    itemsAnswered: answers.length,
+    status: SHORTFALL_STATUS.RESOLUTION_SUBMITTED,
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Reviewing
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** The officer's verdict on one line. */
+export type ItemDecisionInput = {
+  itemId: string;
+  decision: string;
+  remarks?: string;
+};
+
 export type ReviewInput = {
   shortfallId: string;
   actor: Actor;
   accept: boolean;
   remarks: string;
+  /**
+   * Per-item verdicts. Optional — an officer who accepts the whole letter has
+   * accepted every line in it, and forcing them to tick six boxes to say so
+   * would be ceremony. When they ARE supplied they refine the covering
+   * decision; they never contradict it, because `accept: true` still settles
+   * the shortfall and a settled shortfall has no outstanding lines.
+   */
+  items?: ItemDecisionInput[];
   now?: Date;
   meta: Meta;
 };
@@ -574,6 +713,7 @@ export async function reviewResolution(tx: Tx, input: ReviewInput) {
       applicationId: true,
       application: { select: { applicationNumber: true, ltpUserId: true } },
       resolutions: { select: { id: true, attemptNo: true, reviewedAt: true } },
+      items: { select: { id: true, isResolved: true, status: true } },
       feeDemands: {
         select: { demandNumber: true, status: true, totalAmount: true, paidAmount: true },
       },
@@ -583,6 +723,22 @@ export async function reviewResolution(tx: Tx, input: ReviewInput) {
   if (!shortfall) throw notFound('That shortfall could not be found.');
 
   if (input.accept) assertFeeSettled(shortfall);
+
+  const decisions = (input.items ?? []).filter((d) => d.decision);
+  const knownItems = new Set(shortfall.items.map((i) => i.id));
+  const strayDecision = decisions.find((d) => !knownItems.has(d.itemId));
+  if (strayDecision) {
+    throw businessRule(
+      `One of the decisions is against an item that is not part of ${shortfall.shortfallNumber}. Reload the shortfall and try again.`
+    );
+  }
+
+  const badDecision = decisions.find(
+    (d) => d.decision !== ITEM_DECISIONS.ACCEPTED && d.decision !== ITEM_DECISIONS.REJECTED
+  );
+  if (badDecision) {
+    throw businessRule(`"${badDecision.decision}" is not a decision. Accept the item or reject it.`);
+  }
 
   const to = input.accept ? SHORTFALL_STATUS.RESOLVED : SHORTFALL_STATUS.RESOLUTION_REJECTED;
 
@@ -607,10 +763,21 @@ export async function reviewResolution(tx: Tx, input: ReviewInput) {
     });
   }
 
+  await applyItemDecisions(tx, {
+    shortfallId: shortfall.id,
+    decisions,
+    actor: input.actor,
+    fallbackRemarks: remarks,
+    now,
+  });
+
   if (input.accept) {
+    // Accepting the letter settles every line in it, including any the officer
+    // did not tick individually. The shortfall is the unit of decision; the
+    // item verdicts recorded above say HOW it was reached.
     await tx.shortfallItem.updateMany({
       where: { shortfallId: shortfall.id },
-      data: { isResolved: true, resolvedAt: now },
+      data: { isResolved: true, resolvedAt: now, status: SHORTFALL_ITEM_STATUS.ACCEPTED },
     });
     await adjustCounter(tx, shortfall.applicationId, -1);
   }
@@ -638,7 +805,11 @@ export async function reviewResolution(tx: Tx, input: ReviewInput) {
     entityId: shortfall.id,
     applicationId: shortfall.applicationId,
     before: { status: shortfall.status },
-    after: { status: to, accepted: input.accept },
+    after: {
+      status: to,
+      accepted: input.accept,
+      itemDecisions: decisions.map((d) => ({ itemId: d.itemId, decision: d.decision })),
+    },
     remarks,
     ...input.meta,
   });
@@ -727,7 +898,7 @@ export async function settleShortfall(
 
   await tx.shortfallItem.updateMany({
     where: { shortfallId: shortfall.id },
-    data: { isResolved: true, resolvedAt: now },
+    data: { isResolved: true, resolvedAt: now, status: SHORTFALL_ITEM_STATUS.ACCEPTED },
   });
 
   await adjustCounter(tx, shortfall.applicationId, -1);
@@ -768,6 +939,65 @@ export async function settleShortfall(
   });
 
   return { shortfallId: shortfall.id, status: SHORTFALL_STATUS.RESOLVED };
+}
+
+/**
+ * Records the officer's verdict on individual lines.
+ *
+ * Writes the decision onto the LATEST unreviewed response for each item, so
+ * the verdict sits beside the answer it judged rather than floating on the
+ * item. An item with no response yet — a line the applicant ignored — still
+ * takes the status, because "you did not answer this one" is a decision worth
+ * recording even though there is nothing to attach it to.
+ *
+ * An ACCEPTED line sets `isResolved`, which is the column the approval guard
+ * reads. A REJECTED one clears it, so a line sent back cannot leave a file
+ * approvable on the strength of a verdict that went the other way.
+ */
+async function applyItemDecisions(
+  tx: Tx,
+  input: {
+    shortfallId: string;
+    decisions: Array<{ itemId: string; decision: string; remarks?: string }>;
+    actor: Actor;
+    fallbackRemarks: string;
+    now: Date;
+  }
+) {
+  if (!input.decisions.length) return;
+
+  for (const decision of input.decisions) {
+    const accepted = decision.decision === ITEM_DECISIONS.ACCEPTED;
+    const reviewRemarks = (decision.remarks ?? '').trim() || input.fallbackRemarks;
+
+    const latest = await tx.shortfallItemResponse.findFirst({
+      where: { itemId: decision.itemId, reviewedAt: null },
+      orderBy: { attemptNo: 'desc' },
+      select: { id: true },
+    });
+
+    if (latest) {
+      await tx.shortfallItemResponse.update({
+        where: { id: latest.id },
+        data: {
+          reviewedById: input.actor.id,
+          reviewedAt: input.now,
+          decision: decision.decision,
+          reviewRemarks,
+        },
+      });
+    }
+
+    await tx.shortfallItem.update({
+      where: { id: decision.itemId },
+      data: {
+        status: accepted ? SHORTFALL_ITEM_STATUS.ACCEPTED : SHORTFALL_ITEM_STATUS.REJECTED,
+        isResolved: accepted,
+        resolvedAt: accepted ? input.now : null,
+        remarks: reviewRemarks,
+      },
+    });
+  }
 }
 
 /**

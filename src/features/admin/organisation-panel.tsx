@@ -255,7 +255,7 @@ function OfficeDialog({ open, onClose, onSaved, editing, departments, zones }: {
   open: boolean; onClose: () => void; onSaved: () => void; editing: OfficeRow | null;
   departments: DeptRow[]; zones: ZoneRow[];
 }) {
-  const { register, handleSubmit, control, formState: { errors, isSubmitting }, reset, setValue } = useForm({ resolver: zodResolver(officeSchema) });
+  const { register, handleSubmit, formState: { errors, isSubmitting }, reset, setValue } = useForm({ resolver: zodResolver(officeSchema) });
   React.useEffect(() => {
     if (open) reset(editing
       ? { code: editing.code, name: editing.name, departmentId: editing.departmentId ?? '', zoneId: editing.zoneId ?? '', address: editing.address }

@@ -128,7 +128,16 @@ export type RespondResult = {
 export async function respondToShortfall(
   user: AuthUser,
   shortfallId: string,
-  input: { response: string; attachments?: Array<Record<string, unknown>> },
+  input: {
+    response: string;
+    attachments?: Array<Record<string, unknown>>;
+    items?: Array<{
+      itemId: string;
+      response: string;
+      applicantRemarks?: string;
+      attachments?: Array<Record<string, unknown>>;
+    }>;
+  },
   meta: Meta
 ): Promise<RespondResult> {
   const shortfall = await load(user, shortfallId);
@@ -148,6 +157,7 @@ export async function respondToShortfall(
         // Narrows the transition to THIS shortfall, so a file carrying two
         // does not answer both with one response.
         shortfallId: shortfall.id,
+        shortfallItems: input.items,
       },
       meta
     );
@@ -167,6 +177,7 @@ export async function respondToShortfall(
       actor: user,
       response: input.response,
       attachments: input.attachments,
+      items: input.items,
       meta,
     })
   );
@@ -205,7 +216,11 @@ export type ReviewResult = {
 export async function reviewShortfall(
   user: AuthUser,
   shortfallId: string,
-  input: { accept: boolean; remarks: string },
+  input: {
+    accept: boolean;
+    remarks: string;
+    items?: Array<{ itemId: string; decision: string; remarks?: string }>;
+  },
   meta: Meta
 ): Promise<ReviewResult> {
   const shortfall = await load(user, shortfallId);
@@ -250,7 +265,7 @@ export async function reviewShortfall(
       user,
       shortfall.applicationId,
       input.accept ? ACTIONS.ACCEPT_RESOLUTION : ACTIONS.REJECT_RESOLUTION,
-      { remarks: input.remarks, shortfallId: shortfall.id },
+      { remarks: input.remarks, shortfallId: shortfall.id, shortfallDecisions: input.items },
       meta
     );
 
@@ -292,6 +307,7 @@ export async function reviewShortfall(
       actor: user,
       accept: input.accept,
       remarks: input.remarks,
+      items: input.items,
       meta,
     });
   });

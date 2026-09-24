@@ -45,17 +45,18 @@ export type Stop =
   | 'TPA_DOCUMENT_SHORTFALL'
   | 'TPA_FEE_SHORTFALL'
   | 'TPA_SHORTFALL_RESPONDED'
-  | 'ZAD_UNCLAIMED'
-  | 'ZAD_CLAIMED'
-  | 'ZAD_REVIEWING'
-  | 'ZAD_SHORTFALL'
+  | 'TPA_SHORTFALL_CYCLE_2'
+  | 'TPA_SHORTFALL_CYCLE_2_RESPONDED'
+  | 'TPA_SHORTFALL_CYCLE_2_RESOLVED'
+  | 'PO_UNCLAIMED'
+  | 'PO_CLAIMED'
+  | 'PO_REVIEWING'
+  | 'PO_SHORTFALL'
+  | 'ZDD_UNCLAIMED'
+  | 'ZDD_FEE_SHORTFALL'
   | 'ZJD_UNCLAIMED'
+  | 'ZJD_WITH_REPORTED_DOC'
   | 'ZJD_FEE_SHORTFALL'
-  | 'DIRECTOR_UNCLAIMED'
-  | 'DIRECTOR_WITH_REPORTED_FEE'
-  | 'ADDL_COMMISSIONER_UNCLAIMED'
-  | 'ADDL_COMMISSIONER_WITH_REPORTED_DOC'
-  | 'COMMISSIONER_UNCLAIMED'
   | 'APPROVED'
   | 'REJECTED';
 
@@ -88,7 +89,7 @@ export const PLAN: PlanEntry[] = [
   },
   {
     stop: 'DRAFT_LATE',
-    count: 3,
+    count: 2,
     landsOn: 'DRAFT',
     stageCode: null,
     ageDays: [3, 20],
@@ -96,7 +97,7 @@ export const PLAN: PlanEntry[] = [
   },
   {
     stop: 'SUBMITTED',
-    count: 4,
+    count: 3,
     landsOn: 'SUBMITTED',
     stageCode: null,
     ageDays: [4, 28],
@@ -120,7 +121,7 @@ export const PLAN: PlanEntry[] = [
   },
   {
     stop: 'SCRUTINY_FAILED',
-    count: 3,
+    count: 2,
     landsOn: 'SCRUTINY_FAILED',
     stageCode: null,
     ageDays: [8, 45],
@@ -176,7 +177,7 @@ export const PLAN: PlanEntry[] = [
   },
   {
     stop: 'PAYMENT_FAILED',
-    count: 3,
+    count: 2,
     landsOn: 'PAYMENT_FAILED',
     stageCode: null,
     ageDays: [3, 30],
@@ -237,92 +238,106 @@ export const PLAN: PlanEntry[] = [
     note: 'The applicant has answered; the TPA has not yet accepted it.',
   },
   {
-    stop: 'ZAD_UNCLAIMED',
+    // CYCLE 2, PARKED. The applicant answered, the TPA sent it back naming the
+    // item that was still wrong, and it is with the applicant again. This is
+    // the state the multi-cycle history exists to record, and a demonstration
+    // that never reaches it never shows that the first answer is kept.
+    stop: 'TPA_SHORTFALL_CYCLE_2',
     count: 2,
-    landsOn: 'PENDING_ZAD_ZDD',
-    stageCode: 'ZAD_ZDD_REVIEW',
+    landsOn: 'RETURNED_TO_APPLICANT',
+    stageCode: 'LTP_SHORTFALL_ACTION',
+    ageDays: [34, 88],
+    note: 'Answered once, sent back, and now on its second cycle with the applicant.',
+  },
+  {
+    stop: 'TPA_SHORTFALL_CYCLE_2_RESPONDED',
+    count: 1,
+    landsOn: 'SHORTFALL_RESPONDED',
+    stageCode: 'TPA_REVIEW',
+    ageDays: [36, 90],
+    note: 'Second response submitted and waiting on the TPA.',
+  },
+  {
+    stop: 'TPA_SHORTFALL_CYCLE_2_RESOLVED',
+    count: 2,
+    landsOn: 'TPA_REVIEW',
+    stageCode: 'TPA_REVIEW',
+    ageDays: [38, 92],
+    note: 'Two cycles, the second accepted. Both attempts remain on the record.',
+  },
+  // BBAS_STANDARD desks: TPA → Planning Officer → ZDD → ZJD, and the ZJD
+  // decides. Every application type routes through this chain.
+  {
+    stop: 'PO_UNCLAIMED',
+    count: 4,
+    landsOn: 'PENDING_PLANNING_OFFICER',
+    stageCode: 'PLANNING_OFFICER_REVIEW',
     ageDays: [30, 95],
-    note: 'Forwarded by the TPA, waiting at the zonal desk.',
+    note: 'Forwarded by the TPA, waiting at the Planning Officer’s desk.',
   },
   {
-    stop: 'ZAD_CLAIMED',
+    stop: 'PO_CLAIMED',
     count: 1,
-    landsOn: 'PENDING_ZAD_ZDD',
-    stageCode: 'ZAD_ZDD_REVIEW',
+    landsOn: 'PENDING_PLANNING_OFFICER',
+    stageCode: 'PLANNING_OFFICER_REVIEW',
     ageDays: [33, 90],
-    note: 'Held by a zonal officer.',
+    note: 'Held by a Planning Officer.',
   },
   {
-    stop: 'ZAD_REVIEWING',
+    stop: 'PO_REVIEWING',
     count: 1,
-    landsOn: 'ZAD_ZDD_REVIEW',
-    stageCode: 'ZAD_ZDD_REVIEW',
+    landsOn: 'PLANNING_OFFICER_REVIEW',
+    stageCode: 'PLANNING_OFFICER_REVIEW',
     ageDays: [36, 92],
-    note: 'A zonal shortfall was raised, answered and accepted. Under active review.',
+    note: 'A Planning Officer shortfall was raised, answered and accepted. Under active review.',
   },
   {
-    stop: 'ZAD_SHORTFALL',
+    stop: 'PO_SHORTFALL',
     count: 1,
-    landsOn: 'ZAD_ZDD_SHORTFALL',
+    landsOn: 'PLANNING_OFFICER_SHORTFALL',
     stageCode: 'LTP_SHORTFALL_ACTION',
     ageDays: [35, 88],
-    note: 'Returned to the applicant from the zonal desk.',
+    note: 'Returned to the applicant from the Planning Officer’s desk.',
+  },
+  {
+    stop: 'ZDD_UNCLAIMED',
+    count: 5,
+    landsOn: 'PENDING_ZDD',
+    stageCode: 'ZDD_REVIEW',
+    ageDays: [40, 110],
+    note: 'With the Zonal Deputy Director.',
+  },
+  {
+    stop: 'ZDD_FEE_SHORTFALL',
+    count: 1,
+    landsOn: 'ZDD_SHORTFALL',
+    stageCode: 'LTP_SHORTFALL_ACTION',
+    ageDays: [42, 100],
+    note: 'Parked on a fee shortfall raised by the ZDD.',
   },
   {
     stop: 'ZJD_UNCLAIMED',
     count: 4,
     landsOn: 'PENDING_ZJD',
     stageCode: 'ZJD_REVIEW',
-    ageDays: [40, 110],
-    note: 'With the Zonal Joint Director.',
+    ageDays: [50, 140],
+    note: 'Awaiting the Zonal Joint Director’s decision.',
+  },
+  {
+    stop: 'ZJD_WITH_REPORTED_DOC',
+    count: 1,
+    landsOn: 'PENDING_ZJD',
+    stageCode: 'ZJD_REVIEW',
+    ageDays: [55, 135],
+    note: 'Carrying a REPORTED document shortfall raised by the ZDD — it travelled with the file.',
   },
   {
     stop: 'ZJD_FEE_SHORTFALL',
     count: 1,
     landsOn: 'ZJD_FEE_SHORTFALL',
     stageCode: 'LTP_SHORTFALL_ACTION',
-    ageDays: [42, 100],
+    ageDays: [60, 150],
     note: 'Parked on a fee shortfall raised by the ZJD.',
-  },
-  {
-    stop: 'DIRECTOR_UNCLAIMED',
-    count: 3,
-    landsOn: 'PENDING_DIRECTOR_DP',
-    stageCode: 'DIRECTOR_DP_REVIEW',
-    ageDays: [50, 125],
-    note: 'With the Director (Development Plan).',
-  },
-  {
-    stop: 'DIRECTOR_WITH_REPORTED_FEE',
-    count: 1,
-    landsOn: 'PENDING_DIRECTOR_DP',
-    stageCode: 'DIRECTOR_DP_REVIEW',
-    ageDays: [55, 120],
-    note: 'Carrying a REPORTED fee shortfall raised by the ZJD — it travelled with the file.',
-  },
-  {
-    stop: 'ADDL_COMMISSIONER_UNCLAIMED',
-    count: 2,
-    landsOn: 'PENDING_ADDITIONAL_COMMISSIONER',
-    stageCode: 'ADDL_COMMISSIONER_REVIEW',
-    ageDays: [60, 140],
-    note: 'With the Additional Commissioner.',
-  },
-  {
-    stop: 'ADDL_COMMISSIONER_WITH_REPORTED_DOC',
-    count: 1,
-    landsOn: 'DIRECTOR_REPORTED_SHORTFALL',
-    stageCode: 'ADDL_COMMISSIONER_REVIEW',
-    ageDays: [65, 135],
-    note: 'The Director reported a document shortfall and forwarded it anyway.',
-  },
-  {
-    stop: 'COMMISSIONER_UNCLAIMED',
-    count: 3,
-    landsOn: 'PENDING_COMMISSIONER',
-    stageCode: 'COMMISSIONER_REVIEW',
-    ageDays: [70, 155],
-    note: 'Awaiting the Commissioner’s decision.',
   },
   {
     stop: 'APPROVED',
@@ -338,7 +353,7 @@ export const PLAN: PlanEntry[] = [
     landsOn: 'REJECTED',
     stageCode: 'CLOSED_REJECTED',
     ageDays: [90, 190],
-    note: 'Refused by the Commissioner, with reasons recorded.',
+    note: 'Refused by the ZJD, with reasons recorded.',
   },
 ];
 

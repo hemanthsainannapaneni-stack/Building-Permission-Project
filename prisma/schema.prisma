@@ -18,7 +18,10 @@
 //   them — see the constraints migration.
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  // One SQL query per `include` tree instead of one round trip per relation
+  // level. getAuthUser alone went from 7 sequential queries to 2 per request.
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {
@@ -31,19 +34,8 @@ datasource db {
 // ENUMS
 // ═══════════════════════════════════════════════════════════════════════════
 
-
-
-
-
-
-
 /// What an action fundamentally does. Labels and routing stay configurable;
 /// this is only what the engine needs in order to reason about it.
-
-
-
-
-
 
 /// How a task at a stage acquires its assignee.
 ///
@@ -53,27 +45,9 @@ datasource db {
 /// person — and being able to say so in configuration is what keeps the
 /// engine from growing an `if (stage === 'TPA_REVIEW')`.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /// Which way a fee_rule moves the money. A rule never *replaces* a component —
 /// it adjusts the demand after every component has been computed, so the
 /// itemised breakdown always shows what was charged AND what was taken off.
-
 
 /// The six states of Phase 5 §4, plus the two this system needs either side
 /// of them.
@@ -91,11 +65,6 @@ datasource db {
 /// INITIATED payment the gateway never heard of can be abandoned freely, while
 /// a PENDING one may yet be paid and must be verified before anything is said
 /// about it. src/lib/payments.ts holds the mapping to the §4 vocabulary.
-
-
-
-
-
 
 /// The shortfall lifecycle.
 ///
@@ -117,40 +86,24 @@ datasource db {
 /// kept distinct from ACTION_REQUIRED so that a screen can say "your response
 /// was not accepted" rather than silently reverting to the original request.
 
-
 /// BLOCKING parks the workflow at the raising stage. REPORTED travels with the
 /// application and lets it advance — but an open shortfall of EITHER mode
 /// blocks final approval. See docs/03-workflow.md F.5.1.
-
 
 /// OVERDUE, deliberately not "BREACHED": passing the due date has no legal
 /// effect in this system. It notifies and reports, and nothing else.
 /// See docs/07-subsystems.md R.1.1.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 /// Reserved for the revision/renewal question (docs open-questions S4). Only
 /// NEW is used today; the column exists so adding revisions later does not
 /// require a migration over live data.
-
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. IDENTITY & ACCESS
 // ═══════════════════════════════════════════════════════════════════════════
 
 model Role {
-  id          String    @id @default(uuid()) 
+  id          String    @id @default(uuid())
   key         String    @unique
   name        String
   description String    @default("")
@@ -167,7 +120,7 @@ model Role {
 }
 
 model Permission {
-  id          String @id @default(uuid()) 
+  id          String @id @default(uuid())
   key         String @unique
   module      String
   name        String
@@ -180,10 +133,10 @@ model Permission {
 }
 
 model RolePermission {
-  roleId       String   
-  permissionId String   
+  roleId       String
+  permissionId String
   grantedAt    DateTime @default(now())
-  grantedById  String?  
+  grantedById  String?
 
   role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
   permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
@@ -193,18 +146,18 @@ model RolePermission {
 }
 
 model User {
-  id           String     @id @default(uuid()) 
-  email        String     @unique
+  id           String  @id @default(uuid())
+  email        String  @unique
   phone        String?
   passwordHash String
   name         String
-  designation  String     @default("")
-  employeeCode String?    @unique
-  status       String @default("ACTIVE")
+  designation  String  @default("")
+  employeeCode String? @unique
+  status       String  @default("ACTIVE")
 
-  departmentId  String? 
-  officeId      String? 
-  primaryZoneId String? 
+  departmentId  String?
+  officeId      String?
+  primaryZoneId String?
 
   // LTP registration details. Null for departmental users.
   ltpLicenceNo    String?   @unique
@@ -219,7 +172,7 @@ model User {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
   deletedAt          DateTime?
-  createdById        String?   
+  createdById        String?
 
   department    Department?          @relation(fields: [departmentId], references: [id])
   office        Office?              @relation(fields: [officeId], references: [id])
@@ -231,12 +184,20 @@ model User {
   tasks         WorkflowTask[]
   workflowRules WorkflowAssignment[]
 
-  shortfallsRaised    Shortfall[]              @relation("ShortfallRaisedBy")
-  shortfallsClosed    Shortfall[]              @relation("ShortfallClosedBy")
-  resolutionsGiven    ShortfallResolution[]    @relation("ResolutionRespondedBy")
-  resolutionsReviewed ShortfallResolution[]    @relation("ResolutionReviewedBy")
-  notifications       Notification[]
-  preferences         NotificationPreference[]
+  shortfallsRaised      Shortfall[]              @relation("ShortfallRaisedBy")
+  shortfallsClosed      Shortfall[]              @relation("ShortfallClosedBy")
+  resolutionsGiven      ShortfallResolution[]    @relation("ResolutionRespondedBy")
+  resolutionsReviewed   ShortfallResolution[]    @relation("ResolutionReviewedBy")
+  itemResponsesGiven    ShortfallItemResponse[]  @relation("ItemResponseRespondedBy")
+  itemResponsesReviewed ShortfallItemResponse[]  @relation("ItemResponseReviewedBy")
+  notifications         Notification[]
+  notificationLogs      NotificationLog[]
+  preferences           NotificationPreference[]
+  inspectionsAssigned   SiteInspection[]         @relation("SiteInspectionInspector")
+
+  professionalChangesFrom ProfessionalChangeRequest[] @relation("ProfessionalChangeCurrent")
+  professionalChangesTo   ProfessionalChangeRequest[] @relation("ProfessionalChangeProposed")
+  engagements             ApplicationProfessional[]
 
   @@index([status, deletedAt])
   @@index([officeId])
@@ -245,10 +206,10 @@ model User {
 }
 
 model UserRole {
-  userId       String   
-  roleId       String   
+  userId       String
+  roleId       String
   assignedAt   DateTime @default(now())
-  assignedById String?  
+  assignedById String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
@@ -258,8 +219,8 @@ model UserRole {
 }
 
 model Session {
-  id            String    @id @default(uuid()) 
-  userId        String    
+  id            String    @id @default(uuid())
+  userId        String
   /// Hash of the refresh token. The token itself is never stored.
   tokenHash     String    @unique
   ip            String    @default("")
@@ -281,8 +242,8 @@ model Session {
 }
 
 model PasswordReset {
-  id        String    @id @default(uuid()) 
-  userId    String    
+  id        String    @id @default(uuid())
+  userId    String
   tokenHash String    @unique
   expiresAt DateTime
   usedAt    DateTime?
@@ -294,7 +255,7 @@ model PasswordReset {
 }
 
 model LoginAttempt {
-  id        String   @id @default(uuid()) 
+  id        String   @id @default(uuid())
   email     String
   ip        String
   success   Boolean
@@ -311,7 +272,7 @@ model LoginAttempt {
 // ═══════════════════════════════════════════════════════════════════════════
 
 model Department {
-  id        String    @id @default(uuid()) 
+  id        String    @id @default(uuid())
   code      String    @unique
   name      String
   isActive  Boolean   @default(true)
@@ -326,7 +287,7 @@ model Department {
 }
 
 model Zone {
-  id        String    @id @default(uuid()) 
+  id        String    @id @default(uuid())
   code      String    @unique
   name      String
   isActive  Boolean   @default(true)
@@ -344,11 +305,11 @@ model Zone {
 }
 
 model Office {
-  id           String    @id @default(uuid()) 
+  id           String    @id @default(uuid())
   code         String    @unique
   name         String
-  departmentId String?   
-  zoneId       String?   
+  departmentId String?
+  zoneId       String?
   address      String    @default("")
   isActive     Boolean   @default(true)
   createdAt    DateTime  @default(now())
@@ -366,8 +327,8 @@ model Office {
 /// An officer may cover more than one zone. Task routing unions primaryZone
 /// with these rows.
 model UserJurisdiction {
-  userId String 
-  zoneId String 
+  userId String
+  zoneId String
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   zone Zone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
@@ -381,17 +342,17 @@ model UserJurisdiction {
 // ═══════════════════════════════════════════════════════════════════════════
 
 model ApplicationType {
-  id               String  @id @default(uuid()) 
+  id               String  @id @default(uuid())
   code             String  @unique
   name             String
   description      String  @default("")
-  workflowId       String  
+  workflowId       String
   numberPrefix     String  @default("BP")
   /// The scrutiny gate. When false, drawing submission routes straight to
   /// documents. See docs/03-workflow.md F.8.
   requiresScrutiny Boolean @default(true)
   isActive         Boolean @default(true)
-  metadata         Json     @default(dbgenerated("'{}'"))
+  metadata         Json    @default(dbgenerated("'{}'"))
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -407,17 +368,44 @@ model ApplicationType {
 }
 
 model Application {
-  id                String            @id @default(uuid()) 
-  applicationNumber String            @unique
-  applicationTypeId String            
-  ltpUserId         String            
-  zoneId            String?           
-  officeId          String?           
-  status            String @default("DRAFT")
+  id                String  @id @default(uuid())
+  applicationNumber String  @unique
+  applicationTypeId String
+  ltpUserId         String
+  zoneId            String?
+  officeId          String?
+  status            String  @default("DRAFT")
 
   /// Reserved for revision / renewal (open question S4). Unused today.
-  parentApplicationId String?            
-  purpose             String @default("NEW")
+  parentApplicationId String?
+  purpose             String  @default("NEW")
+
+  // ── BBAS general information ────────────────────────────────────────
+  //
+  // The case-level classification the BBAS forms open with. Every one is a
+  // String and not an enum: they are administrator-extensible master data
+  // (MasterData categories CASE_TYPE, PERMISSION_TYPE, NATURE_OF_PERMISSION,
+  // LAND_TYPE, RISK_CATEGORY) and the engine branches on none of them.
+  //
+  // WHERE THE REST OF "GENERAL INFORMATION" LIVES. The BBAS block also names
+  // district, mandal, village, survey number, D.No, plot number, land use
+  // zone, road width, building height and floors. Every one of those already
+  // has a column on `property_details` or `building_details` and is NOT
+  // repeated here — one field, one column, one source of truth. The complete
+  // map from the manual's field name to the column that answers it is in
+  // src/lib/bbas-fields.ts, which the Details screen renders from.
+  caseType           String @default("")
+  permissionType     String @default("")
+  natureOfPermission String @default("")
+  landType           String @default("")
+  /// LPS | NON_LPS | "" — whether the site falls in a Layout Permission
+  /// Scheme area. Recorded as given; nothing branches on it in this phase.
+  lpsStatus          String @default("")
+  /// LOW | MEDIUM | HIGH | "" — derived from the answers to the checklist
+  /// questions marked `affectsRisk`, and re-derivable from them at any time.
+  /// Stored so the register and the dashboards can filter on it without
+  /// replaying nineteen rows per application.
+  riskCategory       String @default("")
 
   submittedAt DateTime?
   approvedAt  DateTime?
@@ -429,39 +417,54 @@ model Application {
   /// they stood at that moment — a licence may lapse or change class after
   /// filing, and the record must show what was true when the file was made.
   ltpDeclaredAt  DateTime?
-  ltpDeclaration Json       @default(dbgenerated("'{}'"))
+  ltpDeclaration Json      @default(dbgenerated("'{}'"))
 
   // Denormalised for list performance. Maintained by the engine, never edited
   // by hand. `openShortfalls` is a cache only — the approval guard re-counts
   // live inside the transaction (docs F.5.1).
-  currentStageId   String?    
+  currentStageId   String?
   currentStageCode String?
   slaDueAt         DateTime?
   slaStatus        String?
-  openShortfalls   Int        @default(0)
+  openShortfalls   Int       @default(0)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  applicationType  ApplicationType       @relation(fields: [applicationTypeId], references: [id])
-  ltp              User                  @relation("ApplicationLtp", fields: [ltpUserId], references: [id])
-  zone             Zone?                 @relation(fields: [zoneId], references: [id])
-  parent           Application?          @relation("ApplicationRevision", fields: [parentApplicationId], references: [id])
-  revisions        Application[]         @relation("ApplicationRevision")
-  applicant        Applicant?
-  property         PropertyDetail?
-  building         BuildingDetail?
-  draft            ApplicationDraft?
-  events           ApplicationEvent[]
-  drawings         Drawing[]
-  documents        ApplicationDocument[]
-  fees             ApplicationFee[]
-  payments         Payment[]
-  shortfalls       Shortfall[]
-  workflowInstance WorkflowInstance?
-  approvalOrder    ApprovalOrder?
-  notifications    Notification[]
+  applicationType    ApplicationType                @relation(fields: [applicationTypeId], references: [id])
+  ltp                User                           @relation("ApplicationLtp", fields: [ltpUserId], references: [id])
+  zone               Zone?                          @relation(fields: [zoneId], references: [id])
+  parent             Application?                   @relation("ApplicationRevision", fields: [parentApplicationId], references: [id])
+  revisions          Application[]                  @relation("ApplicationRevision")
+  applicant          Applicant?
+  property           PropertyDetail?
+  building           BuildingDetail?
+  draft              ApplicationDraft?
+  events             ApplicationEvent[]
+  drawings           Drawing[]
+  bim                BimSubmission?
+  bimModels          BimModel[]
+  documents          ApplicationDocument[]
+  fees               ApplicationFee[]
+  payments           Payment[]
+  shortfalls         Shortfall[]
+  workflowInstance   WorkflowInstance?
+  approvalOrder      ApprovalOrder?
+  others             ApplicationOthers?
+  checklistResponses ApplicationChecklistResponse[]
+  checklistHistory   ChecklistReviewEntry[]
+  siteInspections    SiteInspection[]
+  nocs               ApplicationNoc[]
+  showCauses         ShowCauseNotice[]
+  revocations        RevocationProceeding[]
+  outwardEntries     OutwardEntry[]
+  ltpChanges         ProfessionalChangeRequest[]
+  professionals      ApplicationProfessional[]
+  workCommencement   WorkCommencement?
+  occupancies        OccupancyApplication[]
+  notifications      Notification[]
+  notificationLogs   NotificationLog[]
 
   @@index([ltpUserId, status])
   @@index([status, updatedAt])
@@ -487,15 +490,15 @@ model Application {
 /// the real tables yet. Everything a step has validated lives in
 /// `applicants` / `property_details` / `building_details` like any other data.
 model ApplicationDraft {
-  id            String @id @default(uuid()) 
-  applicationId String @unique 
+  id            String @id @default(uuid())
+  applicationId String @unique
 
   /// Zero-based index into WIZARD_STEPS (src/lib/application-steps.ts).
-  currentStep    Int      @default(0)
+  currentStep    Int  @default(0)
   /// Step keys that have passed their schema at least once.
   completedSteps Json @default(dbgenerated("'[]'"))
   /// Unvalidated in-progress values, so a half-filled step survives a reload.
-  scratch        Json      @default(dbgenerated("'{}'"))
+  scratch        Json @default(dbgenerated("'{}'"))
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -518,8 +521,8 @@ model ApplicationDraft {
 ///
 /// Append-only, enforced by trigger. See the phase-2 migration.
 model ApplicationEvent {
-  id            String @id @default(uuid()) 
-  applicationId String 
+  id            String @id @default(uuid())
+  applicationId String
   /// Per-application, gap-free, allocated inside the writing transaction.
   sequence      Int
 
@@ -527,12 +530,12 @@ model ApplicationEvent {
   title       String
   description String @default("")
 
-  actorId      String? 
+  actorId      String?
   actorName    String  @default("")
   actorRoleKey String  @default("")
 
   /// Anything the renderer needs — from/to status, stage codes, counts.
-  metadata   Json      @default(dbgenerated("'{}'"))
+  metadata   Json     @default(dbgenerated("'{}'"))
   occurredAt DateTime @default(now())
 
   application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
@@ -558,8 +561,8 @@ model ApplicationEvent {
 /// enforced at SUBMIT by the step schemas — see submitApplication() in
 /// src/server/services/applications.ts.
 model Applicant {
-  id            String @id @default(uuid()) 
-  applicationId String @unique 
+  id            String @id @default(uuid())
+  applicationId String @unique
 
   // Applicant. `name` and `phone` are required to file.
   name         String?
@@ -576,6 +579,36 @@ model Applicant {
   ownerName            String  @default("")
   ownerPhone           String  @default("")
   ownerAddress         String  @default("")
+
+  // ── The other parties BBAS records on the application ────────────────
+  //
+  // All optional even on a filed application, and deliberately so: a plot
+  // owner building their own house has no developer and, below the threshold
+  // at which a structural design certificate is called for, no structural
+  // engineer on record either. An empty string here means "none on this
+  // file", which is a real answer and the common one.
+  developerName           String @default("")
+  developerPhone          String @default("")
+  /// The developer's registration with the sanctioning authority, where they
+  /// hold one. Stored as printed on the application.
+  developerRegistrationNo String @default("")
+
+  structuralEngineerName  String @default("")
+  structuralEngineerPhone String @default("")
+  /// Quoted on the structural design certificate the 19-point checklist asks
+  /// for at question 19.
+  structuralEngineerRegNo String @default("")
+
+  /// The professional registration reference the application is filed under —
+  /// the council or authority register entry, as distinct from the individual
+  /// licence numbers above. Recorded verbatim.
+  professionalRegistrationRef String @default("")
+
+  /// Why the applicant wants the building, in their own words — "own
+  /// residence", "rental", "for the firm's office". BBAS collects it and it
+  /// is NOT the same field as the building's use class, which is a planning
+  /// determination and lives on `building_details.buildingUse`.
+  usagePurpose String @default("")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -597,8 +630,8 @@ model Applicant {
 /// 0 m² is not an unmeasured plot, it is a false claim, and no later reader
 /// could tell the two apart.
 model PropertyDetail {
-  id            String @id @default(uuid()) 
-  applicationId String @unique 
+  id            String @id @default(uuid())
+  applicationId String @unique
 
   /// Required to file.
   district     String?
@@ -616,6 +649,31 @@ model PropertyDetail {
   layoutName    String  @default("")
   lpNumber      String  @default("")
 
+  // ── The rest of the BBAS location block ──────────────────────────────
+  //
+  // District, mandal, village, door number (D.No), plot number and survey
+  // number are the columns above. These are the ones BBAS names that had no
+  // column yet. Each is optional: a site is either in a gram panchayat or in
+  // a municipality, either in a township or not, and an empty string is the
+  // honest record of "this one does not apply here".
+  gramPanchayat  String @default("")
+  township       String @default("")
+  sector         String @default("")
+  colony         String @default("")
+  /// Vacant land, built-upon, partly built, agricultural — as recorded on
+  /// the application, and checked against what the inspector finds on site.
+  natureOfSite   String @default("")
+  blockNo        String @default("")
+  /// Re-survey number. Kept apart from `surveyNumbers` because the two are
+  /// different registers and a plot commonly carries both; merging them
+  /// would make it impossible to say which one a given figure came from.
+  rsNo           String @default("")
+  /// The zoning district under the master plan, which is finer than the land
+  /// use zone in `landUseZone` below and is quoted separately on BBAS.
+  zoningDistrict String @default("")
+  /// The name of the abutting road. Its width is `roadWidthM` below.
+  roadName       String @default("")
+
   /// Required to file. NULL = not measured yet; 0 would be a false claim.
   plotAreaSqm Float?
   roadWidthM  Float  @default(0)
@@ -629,7 +687,75 @@ model PropertyDetail {
   boundaryEast  String @default("")
   boundaryWest  String @default("")
 
-  metadata  Json      @default(dbgenerated("'{}'"))
+  // ── The plot arithmetic ──────────────────────────────────────────────
+  //
+  // BBAS does not record one plot area, it records a CHAIN, and the chain is
+  // the point: what the title document says, what is found on the ground,
+  // what is taken away for road widening and green buffer, what the owner
+  // surrenders or gifts, and only then what may actually be built on.
+  //
+  //   gross plot area
+  //     − road widening deduction
+  //     − green buffer deduction
+  //     − surrender / gift area
+  //     = net plot area
+  //
+  // Every term is stored rather than derived, because a demand or a sanction
+  // issued last year was computed from the figures as they stood then, and a
+  // recomputation today would quietly restate it. `netPlotAreaSqm` is the
+  // figure the FAR and coverage are worked out against.
+  //
+  // Nullable throughout, like `plotAreaSqm` above and for the same reason: 0
+  // sq m is not an unmeasured area, it is a false claim, and a later reader
+  // could not tell the two apart. src/lib/plot-area.ts checks the arithmetic
+  // and reports a disagreement rather than silently correcting one.
+  documentAreaSqm          Float?
+  groundAreaSqm            Float?
+  grossPlotAreaSqm         Float?
+  roadWideningDeductionSqm Float?
+  greenBufferDeductionSqm  Float?
+  surrenderGiftAreaSqm     Float?
+  netPlotAreaSqm           Float?
+  /// Transferable development rights loaded onto this plot, in sq m.
+  tdrAreaSqm               Float?
+
+  /// Registration-department market value of the site, in rupees.
+  marketValue Float?
+  /// Recorded verbatim under the label BBAS gives it. The manuals supplied
+  /// for this project name the field and do not expand the abbreviation, so
+  /// nothing here interprets it — it is stored and shown as entered.
+  irr         String @default("")
+
+  hasExistingConstruction Boolean @default(false)
+  /// What is standing, when there is something standing. Read against site
+  /// inspection questions 16-20, which are answered on the ground.
+  existingConstruction    String  @default("")
+
+  // ── Constraints ──────────────────────────────────────────────────────
+  //
+  // Six proximities, each a flag and a measured distance. Real columns and
+  // not a JSON blob because these are QUERIED: the 19-point checklist turns
+  // on the monument buffer (question 17) and the railway buffer (question
+  // 18), the site inspection turns on the HT line and the water body, and a
+  // register of "every live file near a monument" is a question somebody
+  // will ask. A distance of NULL against a true flag means "it is near, and
+  // by how much has not been measured yet" — which is a different fact from
+  // 0 m and has to stay tellable apart from it.
+  religiousStructureNearby    Boolean @default(false)
+  religiousStructureDistanceM Float?
+  aerodromeNearby             Boolean @default(false)
+  aerodromeDistanceM          Float?
+  waterBodyNearby             Boolean @default(false)
+  waterBodyDistanceM          Float?
+  railwayNearby               Boolean @default(false)
+  railwayDistanceM            Float?
+  htLineNearby                Boolean @default(false)
+  htLineDistanceM             Float?
+  monumentNearby              Boolean @default(false)
+  monumentDistanceM           Float?
+  constraintRemarks           String  @default("")
+
+  metadata  Json     @default(dbgenerated("'{}'"))
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -639,13 +765,19 @@ model PropertyDetail {
 }
 
 model BuildingDetail {
-  id            String @id @default(uuid()) 
-  applicationId String @unique 
+  id            String @id @default(uuid())
+  applicationId String @unique
 
   buildingUse    String @default("")
   buildingSubUse String @default("")
   occupancyType  String @default("")
   structureType  String @default("")
+
+  /// BBAS's "Proposed Activity" — what will actually go on inside the
+  /// building. Separate from `buildingUse`, which is the planning use class:
+  /// two proposals can both be COMMERCIAL and one be a bank and the other a
+  /// restaurant, and the difference decides parking, fire and trade licence.
+  proposedActivity String @default("")
 
   numFloors        Int   @default(0)
   numBasements     Int   @default(0)
@@ -673,7 +805,7 @@ model BuildingDetail {
 
   /// Everything the fee engine and a future scrutiny provider may read. Kept
   /// open so a new variable does not need a migration.
-  metadata  Json      @default(dbgenerated("'{}'"))
+  metadata  Json     @default(dbgenerated("'{}'"))
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -684,7 +816,7 @@ model BuildingDetail {
 
 /// Gap-free sequential numbers, allocated under a row lock.
 model NumberSequence {
-  id        String   @id @default(uuid()) 
+  id        String   @id @default(uuid())
   scope     String   @unique
   current   Int      @default(0)
   updatedAt DateTime @updatedAt
@@ -699,21 +831,22 @@ model NumberSequence {
 /// One row per stored object. Nothing else records a storage key, so
 /// retention, scanning and deletion have exactly one place to look.
 model FileObject {
-  id             String     @id @default(uuid()) 
+  id             String    @id @default(uuid())
   /// Provider path. Never sent to a client.
-  storageKey     String     @unique
-  bucket         String     @default("")
+  storageKey     String    @unique
+  bucket         String    @default("")
   originalName   String
   mimeType       String
   sizeBytes      Int
-  checksumSha256 String     @default("")
-  scanStatus     String @default("PENDING")
-  scanDetail     String     @default("")
-  uploadedById   String     
-  createdAt      DateTime   @default(now())
+  checksumSha256 String    @default("")
+  scanStatus     String    @default("PENDING")
+  scanDetail     String    @default("")
+  uploadedById   String
+  createdAt      DateTime  @default(now())
   deletedAt      DateTime?
 
   drawingVersions  DrawingVersion[]
+  bimVersions      BimModelVersion[]
   documentVersions DocumentVersion[]
 
   @@index([scanStatus])
@@ -733,8 +866,8 @@ model FileObject {
 /// scrutiny engine routes on, and is derived from the category rather than
 /// asked for twice.
 model Drawing {
-  id               String   @id @default(uuid()) 
-  applicationId    String   
+  id               String   @id @default(uuid())
+  applicationId    String
   /// Master-data code from the DRAWING_CATEGORY category.
   category         String   @default("OTHER")
   discipline       String   @default("ARCHITECTURAL")
@@ -753,12 +886,12 @@ model Drawing {
 
 /// Append-only. A correction is always a new row.
 model DrawingVersion {
-  id           String   @id @default(uuid()) 
-  drawingId    String   
+  id           String   @id @default(uuid())
+  drawingId    String
   versionNo    Int
-  fileObjectId String   
+  fileObjectId String
   remarks      String   @default("")
-  uploadedById String   
+  uploadedById String
   uploadedAt   DateTime @default(now())
   /// Exactly one true per drawing, enforced by a partial unique index.
   isActive     Boolean  @default(true)
@@ -772,24 +905,186 @@ model DrawingVersion {
   @@map("drawing_versions")
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// 5b. BIM — BUILDING INFORMATION MODEL
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// The BIM particulars of an application: what the model is, where it sits
+/// on the earth, what it says the building is, how it was coordinated, who is
+/// answerable for it, and what the department made of it.
+///
+/// One row per application, created on first save (a read never writes — see
+/// ApplicationOthers). Vocabularies — IFC schema, MVD, LOD, CRS, authoring
+/// tool — are Strings validated against src/lib/bim.ts, not enums, for the
+/// same reason as the rest of the master data: a new IFC release must not need
+/// a migration.
+///
+/// The `model*` quantities are what the MODEL reports, entered from the
+/// authoring tool's schedules. They are deliberately separate from
+/// `building_details`, which is what the APPLICATION declares: the
+/// reconciliation between the two is the point of a BIM-based permission, and
+/// storing one number would make a disagreement invisible.
+model BimSubmission {
+  id            String @id @default(uuid())
+  applicationId String @unique
+
+  // ── Model identity and authoring ─────────────────────────────────────
+  modelReference       String   @default("")
+  authoringSoftware    String   @default("")
+  authoringVersion     String   @default("")
+  /// IFC2X3 | IFC4 | IFC4X3_ADD2
+  ifcSchema            String   @default("")
+  /// ISO 16739 Model View Definition the export was made against.
+  modelViewDefinition  String   @default("")
+  /// LOD_100 … LOD_500 (BIMForum). A permission model is normally LOD 300.
+  levelOfDevelopment   String   @default("")
+  classificationSystem String   @default("")
+  lengthUnit           String   @default("")
+  /// Discipline codes the federated model contains.
+  disciplines          String[] @default([])
+
+  // ── Georeferencing ───────────────────────────────────────────────────
+  /// EPSG code of the projected CRS the model is placed in, e.g. EPSG:32644.
+  crsCode        String @default("")
+  verticalDatum  String @default("")
+  siteLatitude   Float?
+  siteLongitude  Float?
+  /// IfcMapConversion — the model origin in the projected CRS.
+  originEasting  Float?
+  originNorthing Float?
+  originHeightM  Float?
+  /// Clockwise from grid north to project north, in degrees.
+  trueNorthDeg   Float?
+
+  // ── What the model says the building is ──────────────────────────────
+  modelPlotAreaSqm     Float?
+  modelBuiltUpAreaSqm  Float?
+  modelCoverageAreaSqm Float?
+  /// FSI-countable floor area — built-up area less the exempt parts
+  /// (parking, services, basements where the rules exempt them). The FAR
+  /// numerator, as `building_details.floorAreaSqm` is on the application.
+  modelFarAreaSqm      Float?
+  modelBuildingHeightM Float?
+  modelNumFloors       Int?
+  modelNumBasements    Int?
+  modelDwellingUnits   Int?
+  modelParkingSpaces   Int?
+  modelSetbackFrontM   Float?
+  modelSetbackRearM    Float?
+  modelSetbackLeftM    Float?
+  modelSetbackRightM   Float?
+  /// Level schedule: [{ name, elevationM, heightM, grossAreaSqm, use }].
+  storeys              Json   @default(dbgenerated("'[]'"))
+  /// Model content checklist: { [code from BIM_CONTENT_ITEMS]: boolean }.
+  contentChecklist     Json   @default(dbgenerated("'{}'"))
+
+  // ── Coordination and model quality ───────────────────────────────────
+  clashDetectionDone    Boolean   @default(false)
+  clashTool             String    @default("")
+  clashDetectionDate    DateTime?
+  /// NULL means not reported — which is not the same as a reported zero.
+  unresolvedHardClashes Int?
+  unresolvedSoftClashes Int?
+  ifcValidationDone     Boolean   @default(false)
+  ifcValidationTool     String    @default("")
+  /// The 2D drawings on the Drawings tab were generated from this model.
+  drawingsFromModel     Boolean   @default(false)
+
+  // ── Information management (ISO 19650) ───────────────────────────────
+  bepReference           String @default("")
+  cdePlatform            String @default("")
+  informationStandard    String @default("")
+  bimManagerName         String @default("")
+  bimManagerOrganisation String @default("")
+  bimManagerEmail        String @default("")
+  bimManagerPhone        String @default("")
+  bimManagerCredential   String @default("")
+
+  remarks String @default("")
+
+  // ── LTP declaration ──────────────────────────────────────────────────
+  /// Cleared whenever a new model version is uploaded: a declaration is about
+  /// the model that stood when it was made.
+  declaredAt   DateTime?
+  declaredById String?
+
+  // ── Department review ────────────────────────────────────────────────
+  /// NOT_REVIEWED | ACCEPTED | CORRECTIONS_REQUIRED
+  reviewStatus  String    @default("NOT_REVIEWED")
+  reviewRemarks String    @default("")
+  reviewedAt    DateTime?
+  reviewedById  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@map("bim_submissions")
+}
+
+/// One BIM deliverable of an application — the federated IFC model, a
+/// discipline model, a BCF clash set, COBie data or the BIM Execution Plan —
+/// with every version ever uploaded. Same rule as drawings: never overwritten.
+model BimModel {
+  id               String   @id @default(uuid())
+  applicationId    String
+  /// IFC_MODEL | CLASH_REPORT | COBIE | BEP | OTHER — see BIM_FILE_KINDS.
+  kind             String   @default("IFC_MODEL")
+  /// FEDERATED or a discipline code.
+  discipline       String   @default("FEDERATED")
+  title            String   @default("BIM Model")
+  currentVersionNo Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  application Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  versions    BimModelVersion[]
+
+  @@index([applicationId])
+  @@map("bim_models")
+}
+
+/// Append-only. `ifcFacts` is what the server read out of the file itself —
+/// schema, MVD, authoring tool, units, storeys, spaces, georeferencing and
+/// element counts — so the department never has to take the header on trust.
+model BimModelVersion {
+  id           String   @id @default(uuid())
+  bimModelId   String
+  versionNo    Int
+  fileObjectId String
+  remarks      String   @default("")
+  ifcFacts     Json     @default(dbgenerated("'{}'"))
+  uploadedById String
+  uploadedAt   DateTime @default(now())
+  isActive     Boolean  @default(true)
+
+  bimModel BimModel   @relation(fields: [bimModelId], references: [id], onDelete: Cascade)
+  file     FileObject @relation(fields: [fileObjectId], references: [id])
+
+  @@unique([bimModelId, versionNo])
+  @@index([bimModelId, isActive])
+  @@map("bim_model_versions")
+}
+
 /// Placeholder catalogue. `reference` is DELIBERATELY EMPTY in the seed: no
 /// byelaw clause was supplied, and architectural Rule 6 forbids inventing one.
 model ScrutinyRule {
-  id          String        @id @default(uuid()) 
-  code        String        @unique
+  id          String   @id @default(uuid())
+  code        String   @unique
   name        String
-  category    String        @default("")
-  severity    String @default("MAJOR")
-  description String        @default("")
+  category    String   @default("")
+  severity    String   @default("MAJOR")
+  description String   @default("")
   /// What the LTP should DO about it, in plain language. Drives the
   /// "Recommendations" panel on the scrutiny tab. A finding an applicant
   /// cannot act on is a finding that wastes a correction cycle.
-  remedy      String        @default("")
+  remedy      String   @default("")
   /// Statutory citation. Empty until the department supplies one.
-  reference   String        @default("")
-  isActive    Boolean       @default(true)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  reference   String   @default("")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   issues ScrutinyIssue[]
 
@@ -797,19 +1092,19 @@ model ScrutinyRule {
 }
 
 model ScrutinyRequest {
-  id               String         @id @default(uuid()) 
-  drawingVersionId String         
+  id               String    @id @default(uuid())
+  drawingVersionId String
   /// Which provider produced this result. Recorded forever, so an officer
   /// looking at an old file can tell whether it was really machine-checked.
-  engineDriver     String         @default("mock")
+  engineDriver     String    @default("mock")
   externalRef      String?
-  status           String @default("QUEUED")
-  attempt          Int            @default(1)
-  requestedById    String         
-  requestedAt      DateTime       @default(now())
+  status           String    @default("QUEUED")
+  attempt          Int       @default(1)
+  requestedById    String
+  requestedAt      DateTime  @default(now())
   startedAt        DateTime?
   completedAt      DateTime?
-  errorMessage     String         @default("")
+  errorMessage     String    @default("")
 
   drawingVersion DrawingVersion  @relation(fields: [drawingVersionId], references: [id], onDelete: Cascade)
   result         ScrutinyResult?
@@ -821,23 +1116,23 @@ model ScrutinyRequest {
 }
 
 model ScrutinyResult {
-  id                String          @id @default(uuid()) 
-  scrutinyRequestId String          @unique 
+  id                String   @id @default(uuid())
+  scrutinyRequestId String   @unique
   outcome           String
-  criticalCount     Int             @default(0)
-  majorCount        Int             @default(0)
-  minorCount        Int             @default(0)
-  infoCount         Int             @default(0)
+  criticalCount     Int      @default(0)
+  majorCount        Int      @default(0)
+  minorCount        Int      @default(0)
+  infoCount         Int      @default(0)
   /// How many rules were evaluated, and how many the drawing satisfied.
   ///
   /// Recorded rather than derived: "18 of 21 checks passed" is the number an
   /// LTP reads first, and counting issues alone cannot produce it — a run that
   /// evaluated 21 rules and one that evaluated 3 both report 3 failures.
-  checksRun         Int             @default(0)
-  checksPassed      Int             @default(0)
-  summary           String          @default("")
-  rawPayload        Json             @default(dbgenerated("'{}'"))
-  evaluatedAt       DateTime        @default(now())
+  checksRun         Int      @default(0)
+  checksPassed      Int      @default(0)
+  summary           String   @default("")
+  rawPayload        Json     @default(dbgenerated("'{}'"))
+  evaluatedAt       DateTime @default(now())
 
   request ScrutinyRequest @relation(fields: [scrutinyRequestId], references: [id], onDelete: Cascade)
   issues  ScrutinyIssue[]
@@ -847,18 +1142,18 @@ model ScrutinyResult {
 }
 
 model ScrutinyIssue {
-  id               String        @id @default(uuid()) 
-  scrutinyResultId String        
-  ruleId           String?       
+  id               String  @id @default(uuid())
+  scrutinyResultId String
+  ruleId           String?
   ruleCode         String
   severity         String
   title            String
-  description      String        @default("")
-  expectedValue    String        @default("")
-  actualValue      String        @default("")
-  layer            String        @default("")
+  description      String  @default("")
+  expectedValue    String  @default("")
+  actualValue      String  @default("")
+  layer            String  @default("")
   /// Page and coordinates for the drawing overlay.
-  locationHint     Json           @default(dbgenerated("'{}'"))
+  locationHint     Json    @default(dbgenerated("'{}'"))
 
   result ScrutinyResult @relation(fields: [scrutinyResultId], references: [id], onDelete: Cascade)
   rule   ScrutinyRule?  @relation(fields: [ruleId], references: [id])
@@ -869,8 +1164,8 @@ model ScrutinyIssue {
 }
 
 model ScrutinyReport {
-  id               String   @id @default(uuid()) 
-  scrutinyResultId String   @unique 
+  id               String   @id @default(uuid())
+  scrutinyResultId String   @unique
   storageKey       String
   /// True when produced by a non-production provider. Drives the
   /// "DEMO SCRUTINY — NOT A COMPLIANCE CERTIFICATE" watermark.
@@ -887,17 +1182,17 @@ model ScrutinyReport {
 // ═══════════════════════════════════════════════════════════════════════════
 
 model DocumentType {
-  id                String    @id @default(uuid()) 
+  id                String    @id @default(uuid())
   code              String    @unique
   name              String
   description       String    @default("")
   category          String    @default("")
-  allowedMime Json @default(dbgenerated("'[\"application/pdf\"]'"))
+  allowedMime       Json      @default(dbgenerated("'[\"application/pdf\"]'"))
   /// Extensions this type accepts, narrower than the platform allow-list.
   /// Held alongside `allowedMime` rather than derived from it: the upload
   /// pipeline checks extension and sniffed MIME as two independent gates
   /// (docs P.3), and collapsing them into one list would weaken both.
-  allowedExtensions Json @default(dbgenerated("'[\"pdf\"]'"))
+  allowedExtensions Json      @default(dbgenerated("'[\"pdf\"]'"))
   maxSizeMb         Int       @default(10)
   requiresExpiry    Boolean   @default(false)
   isActive          Boolean   @default(true)
@@ -929,10 +1224,10 @@ model DocumentType {
 /// enumerated in advance. An empty scalar means "any", and an empty condition
 /// means "always"; a row with all four empty applies to every application.
 model DocumentRequirement {
-  id                String  @id @default(uuid()) 
+  id                String  @id @default(uuid())
   /// Null = applies to every application type.
-  applicationTypeId String? 
-  documentTypeId    String  
+  applicationTypeId String?
+  documentTypeId    String
   /// Master-data code from BUILDING_USE. Empty = any building type.
   buildingUse       String  @default("")
   /// Master-data code from LAND_USE. Empty = any property type.
@@ -940,7 +1235,7 @@ model DocumentRequirement {
   isMandatory       Boolean @default(true)
   /// JSON condition evaluated against the application context, e.g.
   /// { "gte": ["building.numFloors", 4] }. Empty = always applies.
-  condition         Json     @default(dbgenerated("'{}'"))
+  condition         Json    @default(dbgenerated("'{}'"))
   stageCode         String  @default("DOCUMENT_UPLOAD")
   displayOrder      Int     @default(0)
   helpText          String  @default("")
@@ -958,21 +1253,21 @@ model DocumentRequirement {
 }
 
 model ApplicationDocument {
-  id               String         @id @default(uuid()) 
-  applicationId    String         
-  documentTypeId   String         
-  status           String @default("NOT_UPLOADED")
-  isMandatory      Boolean        @default(true)
-  currentVersionNo Int            @default(0)
+  id               String    @id @default(uuid())
+  applicationId    String
+  documentTypeId   String
+  status           String    @default("NOT_UPLOADED")
+  isMandatory      Boolean   @default(true)
+  currentVersionNo Int       @default(0)
   /// Set when the document exists only to answer a shortfall.
-  shortfallItemId  String?        
+  shortfallItemId  String?
   /// Who DECIDED, and when — a rejection is recorded here as much as an
   /// acceptance. A document with a decision and a REJECTED status is the
   /// commonest reason an application is not complete, and hiding who said so
   /// would make that unanswerable.
-  verifiedById     String?        
+  verifiedById     String?
   verifiedAt       DateTime?
-  verifyRemarks    String         @default("")
+  verifyRemarks    String    @default("")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -988,16 +1283,16 @@ model ApplicationDocument {
 
 /// Append-only.
 model DocumentVersion {
-  id                    String         @id @default(uuid()) 
-  applicationDocumentId String         
+  id                    String    @id @default(uuid())
+  applicationDocumentId String
   versionNo             Int
-  fileObjectId          String         
-  status                String @default("UPLOADED")
-  remarks               String         @default("")
+  fileObjectId          String
+  status                String    @default("UPLOADED")
+  remarks               String    @default("")
   expiresOn             DateTime?
-  uploadedById          String         
-  uploadedAt            DateTime       @default(now())
-  isActive              Boolean        @default(true)
+  uploadedById          String
+  uploadedAt            DateTime  @default(now())
+  isActive              Boolean   @default(true)
 
   document ApplicationDocument @relation(fields: [applicationDocumentId], references: [id], onDelete: Cascade)
   file     FileObject          @relation(fields: [fileObjectId], references: [id])
@@ -1011,11 +1306,11 @@ model DocumentVersion {
 // ═══════════════════════════════════════════════════════════════════════════
 
 model FeeStructure {
-  id                String    @id @default(uuid()) 
+  id                String    @id @default(uuid())
   code              String
   name              String
   version           Int       @default(1)
-  applicationTypeId String?   
+  applicationTypeId String?
   effectiveFrom     DateTime
   effectiveTo       DateTime?
   /// NONE | NEAREST_1 | NEAREST_10 | UP_10
@@ -1028,7 +1323,7 @@ model FeeStructure {
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  createdById String?  
+  createdById String?
 
   applicationType ApplicationType? @relation(fields: [applicationTypeId], references: [id])
   components      FeeComponent[]
@@ -1040,28 +1335,28 @@ model FeeStructure {
 }
 
 model FeeComponent {
-  id             String           @id @default(uuid()) 
-  feeStructureId String           
+  id             String  @id @default(uuid())
+  feeStructureId String
   code           String
   name           String
-  headOfAccount  String           @default("")
+  headOfAccount  String  @default("")
   basis          String
   /// FLAT          → rate is the amount
   /// PER_UNIT_AREA → rate × the context variable named by `variable`
   /// PERCENTAGE    → rate% of the component named by `percentOfCode`
   /// SLAB          → banded by FeeSlab rows
   /// FORMULA       → `expression`, evaluated in a sandbox (docs N.4)
-  rate           Float?         
-  variable       String           @default("")
-  percentOfCode  String           @default("")
-  expression     String           @default("")
-  minAmount      Float?         
-  maxAmount      Float?         
+  rate           Float?
+  variable       String  @default("")
+  percentOfCode  String  @default("")
+  expression     String  @default("")
+  minAmount      Float?
+  maxAmount      Float?
   /// Empty = always charged.
-  condition      Json              @default(dbgenerated("'{}'"))
-  isRefundable   Boolean          @default(false)
-  displayOrder   Int              @default(0)
-  isActive       Boolean          @default(true)
+  condition      Json    @default(dbgenerated("'{}'"))
+  isRefundable   Boolean @default(false)
+  displayOrder   Int     @default(0)
+  isActive       Boolean @default(true)
 
   structure FeeStructure  @relation(fields: [feeStructureId], references: [id], onDelete: Cascade)
   slabs     FeeSlab[]
@@ -1072,14 +1367,14 @@ model FeeComponent {
 }
 
 model FeeSlab {
-  id             String   @id @default(uuid()) 
-  feeComponentId String   
-  fromValue      Float  
+  id             String @id @default(uuid())
+  feeComponentId String
+  fromValue      Float
   /// Null = open ended.
-  toValue        Float? 
-  rate           Float  
-  flatAmount     Float? 
-  displayOrder   Int      @default(0)
+  toValue        Float?
+  rate           Float
+  flatAmount     Float?
+  displayOrder   Int    @default(0)
 
   component FeeComponent @relation(fields: [feeComponentId], references: [id], onDelete: Cascade)
 
@@ -1099,26 +1394,26 @@ model FeeSlab {
 /// same frozen context. `basis` is FLAT (a fixed amount) or PERCENTAGE (of the
 /// subtotal, or of the components named in `appliesToCode`).
 model FeeRule {
-  id             String            @id @default(uuid()) 
-  feeStructureId String            
+  id             String  @id @default(uuid())
+  feeStructureId String
   code           String
   name           String
   kind           String
   /// FLAT or PERCENTAGE only. The other bases have no meaning for an
   /// adjustment and are refused when a structure is saved.
-  basis          String @default("PERCENTAGE")
-  rate           Float?          
+  basis          String  @default("PERCENTAGE")
+  rate           Float?
   /// Comma-separated component codes this applies to. Empty = the subtotal.
-  appliesToCode  String            @default("")
+  appliesToCode  String  @default("")
   /// Caps on the ADJUSTMENT itself, not on the demand.
-  minAmount      Float?          
-  maxAmount      Float?          
+  minAmount      Float?
+  maxAmount      Float?
   /// Empty = always applied.
-  condition      Json               @default(dbgenerated("'{}'"))
+  condition      Json    @default(dbgenerated("'{}'"))
   /// Why this exists, in the words an applicant should see on the demand.
-  reason         String            @default("")
-  displayOrder   Int               @default(0)
-  isActive       Boolean           @default(true)
+  reason         String  @default("")
+  displayOrder   Int     @default(0)
+  isActive       Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1132,13 +1427,13 @@ model FeeRule {
 
 /// A demand. Immutable once ISSUED — a correction is a new demand.
 model ApplicationFee {
-  id            String          @id @default(uuid()) 
-  applicationId String          
-  demandNumber  String          @unique
+  id            String @id @default(uuid())
+  applicationId String
+  demandNumber  String @unique
   type          String @default("ORIGINAL")
   status        String @default("DRAFT")
 
-  feeStructureId      String 
+  feeStructureId      String
   feeStructureVersion Int
   /// Copied, not joined. A structure can be renamed or deactivated years
   /// later; the demand must still be able to say which schedule it was raised
@@ -1146,20 +1441,20 @@ model ApplicationFee {
   feeStructureCode    String @default("")
   /// The exact variable values used, frozen at issue time. Re-running the
   /// calculator later must never change an issued demand.
-  calculationInputs   Json    @default(dbgenerated("'{}'"))
+  calculationInputs   Json   @default(dbgenerated("'{}'"))
   /// The rounding rule in force at issue time, for the same reason.
   roundingRule        String @default("NEAREST_1")
 
-  subtotal        Float @default(0) 
+  subtotal        Float @default(0)
   /// Signed: negative for a net rebate, positive for a net surcharge.
   /// `totalAmount = subtotal + adjustmentTotal`, enforced by a CHECK.
-  adjustmentTotal Float @default(0) 
-  totalAmount     Float @default(0) 
-  paidAmount      Float @default(0) 
+  adjustmentTotal Float @default(0)
+  totalAmount     Float @default(0)
+  paidAmount      Float @default(0)
 
-  generatedById String? 
+  generatedById String?
 
-  raisedByShortfallId String?   
+  raisedByShortfallId String?
   dueDate             DateTime?
   issuedAt            DateTime?
   paidAt              DateTime?
@@ -1185,26 +1480,26 @@ model ApplicationFee {
 /// A frozen snapshot. Carries how the number was reached, so an officer can
 /// audit a fee without re-running anything.
 model FeeLineItem {
-  id               String   @id @default(uuid()) 
-  applicationFeeId String   
+  id               String  @id @default(uuid())
+  applicationFeeId String
   /// COMPONENT (a charge) or ADJUSTMENT (a rebate or surcharge). A String so
   /// the demand can carry a line type a later phase invents — a rounding line,
   /// an interest line — without a migration over issued demands.
-  kind             String   @default("COMPONENT")
-  feeComponentId   String?  
-  feeRuleId        String?  
+  kind             String  @default("COMPONENT")
+  feeComponentId   String?
+  feeRuleId        String?
   componentCode    String
   componentName    String
-  headOfAccount    String   @default("")
+  headOfAccount    String  @default("")
   basis            String
-  variableName     String   @default("")
-  variableValue    Float? 
-  rateApplied      Float? 
-  computedAmount   Float  
+  variableName     String  @default("")
+  variableValue    Float?
+  rateApplied      Float?
+  computedAmount   Float
   /// After min/max clamping and rounding. Negative on a rebate line.
-  amount           Float  
-  calculationNote  String   @default("")
-  displayOrder     Int      @default(0)
+  amount           Float
+  calculationNote  String  @default("")
+  displayOrder     Int     @default(0)
 
   fee       ApplicationFee @relation(fields: [applicationFeeId], references: [id], onDelete: Cascade)
   component FeeComponent?  @relation(fields: [feeComponentId], references: [id])
@@ -1226,21 +1521,21 @@ model FeeLineItem {
 /// windows open against the same demand" is refused by the database rather
 /// than by whoever remembers to check.
 model Payment {
-  id               String        @id @default(uuid()) 
-  applicationFeeId String        
+  id               String @id @default(uuid())
+  applicationFeeId String
   /// Denormalised from the demand, and not a shortcut: the payments register,
   /// the Payments tab and the reconciliation sweep all ask "by application",
   /// and a demand is never reassigned to a different application, so the copy
   /// cannot go stale.
-  applicationId    String        
+  applicationId    String
   /// Our reference, sent to the gateway. The only identifier a provider is
   /// given, and the one a webhook is matched back on.
-  paymentRef       String        @unique
-  provider         String        @default("mock")
-  amount           Float       
+  paymentRef       String @unique
+  provider         String @default("mock")
+  amount           Float
   status           String @default("INITIATED")
   /// Which attempt against this demand. 1-based, allocated at initiate.
-  attemptNo        Int           @default(1)
+  attemptNo        Int    @default(1)
 
   /// What the gateway called it. Empty until the gateway has said — a payment
   /// carrying a transaction id is a payment the gateway has acknowledged.
@@ -1250,7 +1545,7 @@ model Payment {
   /// UPI, CARD, NETBANKING… reported by the gateway, never chosen by us.
   method          String  @default("")
 
-  initiatedById    String    
+  initiatedById    String
   initiatedAt      DateTime  @default(now())
   settledAt        DateTime?
   failureReason    String    @default("")
@@ -1288,20 +1583,20 @@ model Payment {
 
 /// One row per interaction with the gateway. Never updated after insert.
 model PaymentTransaction {
-  id           String        @id @default(uuid()) 
-  paymentId    String        
-  attemptNo    Int           @default(1)
+  id           String   @id @default(uuid())
+  paymentId    String
+  attemptNo    Int      @default(1)
   /// INITIATE | RETURN | WEBHOOK | VERIFY | RECONCILE
   direction    String
   status       String
   gatewayTxnId String?
-  bankRef      String        @default("")
-  method       String        @default("")
-  amount       Float?      
+  bankRef      String   @default("")
+  method       String   @default("")
+  amount       Float?
   /// Provider payload, with secrets stripped before persistence.
-  rawPayload   Json           @default(dbgenerated("'{}'"))
-  message      String        @default("")
-  occurredAt   DateTime      @default(now())
+  rawPayload   Json     @default(dbgenerated("'{}'"))
+  message      String   @default("")
+  occurredAt   DateTime @default(now())
 
   payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
 
@@ -1313,7 +1608,7 @@ model PaymentTransaction {
 /// Every callback lands here first. The unique key makes duplicate delivery a
 /// no-op instead of a double credit.
 model PaymentWebhookEvent {
-  id          String    @id @default(uuid()) 
+  id          String    @id @default(uuid())
   provider    String
   externalId  String
   /// The provider's own event name, kept verbatim. Providers send several
@@ -1323,7 +1618,7 @@ model PaymentWebhookEvent {
   /// nothing here — an event we cannot place is the one worth being able to
   /// look up later.
   paymentRef  String    @default("")
-  paymentId   String?   
+  paymentId   String?
   signatureOk Boolean   @default(false)
   processed   Boolean   @default(false)
   processedAt DateTime?
@@ -1340,15 +1635,15 @@ model PaymentWebhookEvent {
 }
 
 model PaymentReceipt {
-  id            String   @id @default(uuid()) 
-  paymentId     String   @unique 
+  id            String   @id @default(uuid())
+  paymentId     String   @unique
   receiptNumber String   @unique
-  amount        Float  
+  amount        Float
   issuedAt      DateTime @default(now())
   storageKey    String   @default("")
   /// Frozen payer and line items. A later fee revision must never alter a
   /// receipt already given to a citizen.
-  snapshot      Json      @default(dbgenerated("'{}'"))
+  snapshot      Json     @default(dbgenerated("'{}'"))
 
   payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
 
@@ -1357,14 +1652,14 @@ model PaymentReceipt {
 }
 
 model Refund {
-  id            String       @id @default(uuid()) 
-  paymentId     String       
-  amount        Float      
+  id            String    @id @default(uuid())
+  paymentId     String
+  amount        Float
   reason        String
-  status        String @default("REQUESTED")
+  status        String    @default("REQUESTED")
   externalRef   String?
-  requestedById String       
-  requestedAt   DateTime     @default(now())
+  requestedById String
+  requestedAt   DateTime  @default(now())
   completedAt   DateTime?
 
   payment Payment @relation(fields: [paymentId], references: [id])
@@ -1377,7 +1672,7 @@ model Refund {
 // ═══════════════════════════════════════════════════════════════════════════
 
 model Workflow {
-  id          String    @id @default(uuid()) 
+  id          String    @id @default(uuid())
   code        String
   name        String
   version     Int       @default(1)
@@ -1398,11 +1693,11 @@ model Workflow {
 }
 
 model WorkflowStage {
-  id            String             @id @default(uuid()) 
-  workflowId    String             
+  id            String  @id @default(uuid())
+  workflowId    String
   code          String
   name          String
-  type          String @default("REVIEW")
+  type          String  @default("REVIEW")
   sequence      Int
   /// Roles that may act at this stage. Multiple = any one of them.
   ownerRoleKeys Json
@@ -1410,15 +1705,15 @@ model WorkflowStage {
   entryStatus   String
   /// Status while an owner is actively working it.
   workingStatus String?
-  slaDays       Int                @default(0)
+  slaDays       Int     @default(0)
   /// Where an instance starts. Exactly one per workflow, checked before
   /// publishing. Reachability is computed from here, so the graph validator
   /// does not have to guess which stage is the beginning.
-  isEntry       Boolean            @default(false)
-  isTerminal    Boolean            @default(false)
-  allowReassign Boolean            @default(true)
-  description   String             @default("")
-  isActive      Boolean            @default(true)
+  isEntry       Boolean @default(false)
+  isTerminal    Boolean @default(false)
+  allowReassign Boolean @default(true)
+  description   String  @default("")
+  isActive      Boolean @default(true)
 
   workflow    Workflow             @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   fromTrans   WorkflowTransition[] @relation("FromStage")
@@ -1435,22 +1730,22 @@ model WorkflowStage {
 /// Catalogue of actions. Reusable across stages — a stage becomes able to
 /// perform one by having a transition row.
 model WorkflowAction {
-  id                 String     @id @default(uuid()) 
-  code               String     @unique
+  id                 String  @id @default(uuid())
+  code               String  @unique
   label              String
   kind               String
   /// primary | secondary | destructive
-  intent             String     @default("secondary")
+  intent             String  @default("secondary")
   /// The capability an actor must hold. Configuration, not code: granting the
   /// Additional Commissioner the power to report a shortfall and forward is an
   /// admin edit, and the engine has no table of which action needs what.
   /// Empty falls back to the action KIND's default — see actionCapability().
-  capabilityKey      String     @default("")
-  requiresRemarks    Boolean    @default(true)
-  requiresAttachment Boolean    @default(false)
-  confirmText        String     @default("")
-  displayOrder       Int        @default(0)
-  isActive           Boolean    @default(true)
+  capabilityKey      String  @default("")
+  requiresRemarks    Boolean @default(true)
+  requiresAttachment Boolean @default(false)
+  confirmText        String  @default("")
+  displayOrder       Int     @default(0)
+  isActive           Boolean @default(true)
 
   transitions WorkflowTransition[]
 
@@ -1460,29 +1755,29 @@ model WorkflowAction {
 /// THE routing table. (stage, status?, action, role) → (stage, status) + effects.
 /// Nothing in the codebase encodes routing except these rows.
 model WorkflowTransition {
-  id              String             @id @default(uuid()) 
-  workflowId      String             
-  fromStageId     String             
-  actionId        String             
+  id              String  @id @default(uuid())
+  workflowId      String
+  fromStageId     String
+  actionId        String
   /// Null = applies whatever the current status is.
   fromStatus      String?
   /// Null when an effect decides — RETURN_TO_ORIGIN resumes the parked stage.
-  toStageId       String?            
+  toStageId       String?
   toStatus        String
   /// Subset of the from-stage owners. Empty = all owners of the stage.
-  allowedRoleKeys Json @default(dbgenerated("'[]'"))
+  allowedRoleKeys Json    @default(dbgenerated("'[]'"))
 
   /// Preconditions, all must hold. e.g. ["documents_complete","fees_paid"]
-  guards Json @default(dbgenerated("'[]'"))
+  guards      Json    @default(dbgenerated("'[]'"))
   /// Ordered side effects, e.g.
   /// [{"type":"RAISE_SHORTFALL","kind":"FEE","mode":"BLOCKING"}]
-  effects     Json      @default(dbgenerated("'[]'"))
+  effects     Json    @default(dbgenerated("'[]'"))
   /// Event code emitted on success; drives notification templates.
-  notifyEvent String   @default("")
+  notifyEvent String  @default("")
   /// START | PAUSE | RESUME | STOP | NONE
-  slaBehavior String   @default("START")
-  priority    Int      @default(0)
-  isActive    Boolean  @default(true)
+  slaBehavior String  @default("START")
+  priority    Int     @default(0)
+  isActive    Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1498,19 +1793,19 @@ model WorkflowTransition {
 }
 
 model WorkflowInstance {
-  id              String                 @id @default(uuid()) 
-  applicationId   String                 @unique 
-  workflowId      String                 
+  id              String    @id @default(uuid())
+  applicationId   String    @unique
+  workflowId      String
   /// Pinned at start. Editing configuration never corrupts an in-flight file.
   workflowVersion Int
-  currentStageId  String?                
-  status          String @default("ACTIVE")
+  currentStageId  String?
+  status          String    @default("ACTIVE")
   /// Where to resume after a blocking shortfall is accepted. This single
   /// column is what keeps "return to LTP, then back to whoever raised it"
   /// out of the code entirely.
-  parkedStageId   String?                
+  parkedStageId   String?
   parkedAt        DateTime?
-  startedAt       DateTime               @default(now())
+  startedAt       DateTime  @default(now())
   completedAt     DateTime?
 
   application Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
@@ -1522,24 +1817,24 @@ model WorkflowInstance {
 }
 
 model WorkflowTask {
-  id              String  @id @default(uuid()) 
-  instanceId      String  
-  stageId         String  
+  id              String  @id @default(uuid())
+  instanceId      String
+  stageId         String
   /// Role-addressed until an officer claims it.
   assignedRoleKey String
-  assignedUserId  String? 
-  zoneId          String? 
+  assignedUserId  String?
+  zoneId          String?
 
-  status        String @default("PENDING")
+  status        String    @default("PENDING")
   /// Higher sorts first in the officer queue. Stamped from the assignment
   /// rule that routed the task, so "this zone's files are urgent" is a
   /// configuration change rather than a code one.
-  priority      Int        @default(0)
-  receivedAt    DateTime   @default(now())
+  priority      Int       @default(0)
+  receivedAt    DateTime  @default(now())
   claimedAt     DateTime?
   completedAt   DateTime?
-  completedById String?    
-  actionTaken   String     @default("")
+  completedById String?
+  actionTaken   String    @default("")
 
   instance WorkflowInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
   stage    WorkflowStage    @relation(fields: [stageId], references: [id])
@@ -1566,21 +1861,21 @@ model WorkflowTask {
 /// row at all the stage's own `ownerRoleKeys[0]` is used, so an unconfigured
 /// workflow still routes rather than dropping the file on the floor.
 model WorkflowAssignment {
-  id         String  @id @default(uuid()) 
-  workflowId String  
-  stageId    String  
+  id         String  @id @default(uuid())
+  workflowId String
+  stageId    String
   /// Must be one of the stage's ownerRoleKeys — validated before publishing.
   roleKey    String
   /// Null = applies to every zone. A zone-specific row outranks it.
-  zoneId     String? 
+  zoneId     String?
   /// Only meaningful for DIRECT. Ignored by the queue strategies.
-  userId     String? 
+  userId     String?
 
-  strategy String @default("ROLE_QUEUE")
+  strategy String  @default("ROLE_QUEUE")
   /// Stamped onto tasks this rule routes.
-  priority Int                @default(0)
-  isActive Boolean            @default(true)
-  notes    String             @default("")
+  priority Int     @default(0)
+  isActive Boolean @default(true)
+  notes    String  @default("")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1597,8 +1892,8 @@ model WorkflowAssignment {
 
 /// Append-only. One row per action performed. Never updated, never deleted.
 model WorkflowHistory {
-  id             String   @id @default(uuid()) 
-  instanceId     String   
+  id             String   @id @default(uuid())
+  instanceId     String
   sequence       Int
   fromStageCode  String   @default("")
   toStageCode    String   @default("")
@@ -1610,12 +1905,12 @@ model WorkflowHistory {
   /// department has no officer behind it, and naming one would be a fiction on
   /// a record that is quoted back to applicants. `actorName` still says
   /// "System", so the row reads correctly either way.
-  actorId        String?  
+  actorId        String?
   actorName      String
   actorRoleKey   String
   remarks        String   @default("")
-  attachments    Json      @default(dbgenerated("'[]'"))
-  effectsApplied Json      @default(dbgenerated("'[]'"))
+  attachments    Json     @default(dbgenerated("'[]'"))
+  effectsApplied Json     @default(dbgenerated("'[]'"))
   occurredAt     DateTime @default(now())
 
   instance   WorkflowInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
@@ -1631,18 +1926,18 @@ model WorkflowHistory {
 // ═══════════════════════════════════════════════════════════════════════════
 
 model Shortfall {
-  id              String          @id @default(uuid()) 
-  applicationId   String          
-  shortfallNumber String          @unique
+  id              String @id @default(uuid())
+  applicationId   String
+  shortfallNumber String @unique
   kind            String
   mode            String @default("BLOCKING")
   status          String @default("RAISED")
 
   raisedAtStageCode String
-  raisedById        String    
+  raisedById        String
   raisedByRoleKey   String
   raisedAt          DateTime  @default(now())
-  historyId         String?   
+  historyId         String?
   title             String
   /// What is wrong, in the officer's words.
   description       String
@@ -1658,7 +1953,7 @@ model Shortfall {
   notifiedAt     DateTime?
   respondedAt    DateTime?
   closedAt       DateTime?
-  closedById     String?   
+  closedById     String?
   closureRemarks String    @default("")
 
   application Application           @relation(fields: [applicationId], references: [id], onDelete: Cascade)
@@ -1679,42 +1974,116 @@ model Shortfall {
 }
 
 model ShortfallItem {
-  id             String    @id @default(uuid()) 
-  shortfallId    String    
+  id             String    @id @default(uuid())
+  shortfallId    String
   /// For DOCUMENT shortfalls.
-  documentTypeId String?   
+  documentTypeId String?
   description    String
   /// For FEE shortfalls.
-  amount         Float?  
+  amount         Float?
   isResolved     Boolean   @default(false)
   resolvedAt     DateTime?
   displayOrder   Int       @default(0)
 
-  shortfall    Shortfall     @relation(fields: [shortfallId], references: [id], onDelete: Cascade)
-  documentType DocumentType? @relation(fields: [documentTypeId], references: [id])
+  /// What FAMILY of deficiency this is — "Title", "Setback", "Structural".
+  /// Narrower than the shortfall's `kind`, which is one word for the whole
+  /// letter. A letter listing six documents and one setback is a DOCUMENT
+  /// shortfall, and the applicant still has to be told which line is which.
+  category         String @default("")
+  /// What the applicant must do about THIS line. The shortfall carries the
+  /// same field for the letter as a whole; this one is per-item because
+  /// "supply it" and "have it re-certified" are different instructions and an
+  /// applicant answering six lines needs them beside the line they belong to.
+  requiredAction   String @default("")
+  /// The document named in words, for the case where no `documentTypeId`
+  /// exists for it — a bank challan, a letter from a structural engineer.
+  /// Never a substitute for the type when there IS one.
+  requiredDocument String @default("")
+  /// The officer's note on this line, written when the shortfall was raised.
+  remarks          String @default("")
 
+  /// Per-item lifecycle. Coarser than the shortfall's own, because an item
+  /// has no notification of its own: PENDING → RESPONDED → ACCEPTED/REJECTED.
+  /// `isResolved` stays the column the approval guard reads — this one says
+  /// HOW it got there, and a REJECTED item is unresolved and says why.
+  status String @default("PENDING")
+
+  /// Whether approval may proceed with this line unresolved.
+  ///
+  /// Defaults to TRUE, and that direction is deliberate: an item somebody
+  /// forgot to classify blocks, rather than silently waving a file through.
+  /// Nothing in this system sets it false automatically.
+  isMandatory Boolean @default(true)
+
+  shortfall    Shortfall               @relation(fields: [shortfallId], references: [id], onDelete: Cascade)
+  documentType DocumentType?           @relation(fields: [documentTypeId], references: [id])
+  responses    ShortfallItemResponse[]
+
+  @@index([shortfallId, displayOrder])
   @@map("shortfall_items")
+}
+
+/// One line of one cycle: what the applicant said about THIS item on THIS
+/// attempt, and what the officer decided about it.
+///
+/// Append-only, and keyed by `attemptNo` against the same counter
+/// `ShortfallResolution` uses — so cycle 2 of a shortfall has a resolution row
+/// carrying the covering response and one of these per item that was answered
+/// again. An item answered in cycle 1 and re-answered in cycle 2 has two rows,
+/// not one that was edited, which is what makes "I sent that weeks ago"
+/// answerable from the record.
+model ShortfallItemResponse {
+  id           String  @id @default(uuid())
+  itemId       String
+  /// Matches ShortfallResolution.attemptNo on the same shortfall.
+  attemptNo    Int
+  /// The covering response this line was submitted with. Nullable only so a
+  /// line can be recorded before its resolution row exists; in practice the
+  /// engine writes both in one transaction.
+  resolutionId String?
+
+  respondedById    String
+  respondedAt      DateTime @default(now())
+  response         String
+  applicantRemarks String   @default("")
+  attachments      Json     @default(dbgenerated("'[]'"))
+
+  reviewedById  String?
+  reviewedAt    DateTime?
+  /// ACCEPTED or REJECTED. Null while nobody has looked at this line.
+  decision      String?
+  reviewRemarks String    @default("")
+
+  item        ShortfallItem        @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  resolution  ShortfallResolution? @relation(fields: [resolutionId], references: [id], onDelete: SetNull)
+  respondedBy User                 @relation("ItemResponseRespondedBy", fields: [respondedById], references: [id])
+  reviewedBy  User?                @relation("ItemResponseReviewedBy", fields: [reviewedById], references: [id])
+
+  @@unique([itemId, attemptNo])
+  @@index([resolutionId])
+  @@map("shortfall_item_responses")
 }
 
 /// Each LTP response and each officer verdict. Append-only, so a rejected
 /// resolution followed by a second attempt is fully visible.
 model ShortfallResolution {
-  id            String   @id @default(uuid()) 
-  shortfallId   String   
+  id            String   @id @default(uuid())
+  shortfallId   String
   attemptNo     Int
-  respondedById String   
+  respondedById String
   respondedAt   DateTime @default(now())
   response      String
-  attachments   Json      @default(dbgenerated("'[]'"))
+  attachments   Json     @default(dbgenerated("'[]'"))
 
-  reviewedById  String?   
+  reviewedById  String?
   reviewedAt    DateTime?
   accepted      Boolean?
   reviewRemarks String    @default("")
 
-  shortfall   Shortfall @relation(fields: [shortfallId], references: [id], onDelete: Cascade)
-  respondedBy User      @relation("ResolutionRespondedBy", fields: [respondedById], references: [id])
-  reviewedBy  User?     @relation("ResolutionReviewedBy", fields: [reviewedById], references: [id])
+  shortfall     Shortfall               @relation(fields: [shortfallId], references: [id], onDelete: Cascade)
+  respondedBy   User                    @relation("ResolutionRespondedBy", fields: [respondedById], references: [id])
+  reviewedBy    User?                   @relation("ResolutionReviewedBy", fields: [reviewedById], references: [id])
+  itemResponses ShortfallItemResponse[]
 
   @@unique([shortfallId, attemptNo])
   @@map("shortfall_resolutions")
@@ -1725,54 +2094,60 @@ model ShortfallResolution {
 // ═══════════════════════════════════════════════════════════════════════════
 
 model SlaRule {
-  id                String      @id @default(uuid()) 
-  workflowStageId   String      
-  applicationTypeId String?     
+  id                String  @id @default(uuid())
+  workflowStageId   String
+  applicationTypeId String?
   days              Int
-  calendar          String @default("WORKING_DAYS")
-  warnAtPercent     Int         @default(70)
+  calendar          String  @default("WORKING_DAYS")
+  warnAtPercent     Int     @default(70)
   /// Notified when a task goes OVERDUE. One role, one notification — see
   /// docs R.1.1 on why escalation is deliberately shallow.
   escalateToRoleKey String?
-  pauseOnShortfall  Boolean     @default(true)
-  isActive          Boolean     @default(true)
+  pauseOnShortfall  Boolean @default(true)
+  isActive          Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   stage           WorkflowStage    @relation(fields: [workflowStageId], references: [id], onDelete: Cascade)
   applicationType ApplicationType? @relation(fields: [applicationTypeId], references: [id])
+  instances       SlaInstance[]
 
   @@unique([workflowStageId, applicationTypeId])
   @@map("sla_rules")
 }
 
 model SlaInstance {
-  id          String    @id @default(uuid()) 
-  taskId      String    @unique 
-  ruleId      String?   
+  id          String    @id @default(uuid())
+  taskId      String    @unique
+  ruleId      String?
   startedAt   DateTime  @default(now())
   dueAt       DateTime
   pausedAt    DateTime?
   pausedMs    Int       @default(0)
   completedAt DateTime?
-  status      String @default("ON_TRACK")
+  status      String    @default("ON_TRACK")
   /// When the clock passed its due date. Notification only — no legal effect.
   overdueAt   DateTime?
   overdueDays Int       @default(0)
   notifiedAt  DateTime?
 
   task WorkflowTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  /// The rule this clock was started from. Nullable and SetNull on delete: a
+  /// rule an administrator removes must not take the running clocks with it,
+  /// and a clock whose rule is gone still has its own dueAt — which is the
+  /// figure that was promised and the one that must survive.
+  rule SlaRule?     @relation(fields: [ruleId], references: [id], onDelete: SetNull)
 
   @@index([status, dueAt])
   @@map("sla_instances")
 }
 
 model Holiday {
-  id     String   @id @default(uuid()) 
-  date   DateTime @unique 
+  id     String   @id @default(uuid())
+  date   DateTime @unique
   name   String
-  zoneId String?  
+  zoneId String?
 
   @@map("holidays")
 }
@@ -1782,17 +2157,17 @@ model Holiday {
 // ═══════════════════════════════════════════════════════════════════════════
 
 model NotificationTemplate {
-  id                 String              @id @default(uuid()) 
+  id                 String  @id @default(uuid())
   eventCode          String
   channel            String
-  locale             String              @default("en")
-  subject            String              @default("")
+  locale             String  @default("en")
+  subject            String  @default("")
   body               String
   /// DLT template id — mandatory for Indian SMS delivery. The SMS adapter
   /// refuses to send without one.
-  providerTemplateId String              @default("")
-  variables Json @default(dbgenerated("'[]'"))
-  isActive           Boolean             @default(true)
+  providerTemplateId String  @default("")
+  variables          Json    @default(dbgenerated("'[]'"))
+  isActive           Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1805,9 +2180,9 @@ model NotificationTemplate {
 
 /// In-app notification centre.
 model Notification {
-  id            String    @id @default(uuid()) 
-  userId        String    
-  applicationId String?   
+  id            String    @id @default(uuid())
+  userId        String
+  applicationId String?
   eventCode     String
   title         String
   message       String
@@ -1825,36 +2200,47 @@ model Notification {
 
 /// One row per recipient per channel per event — the delivery audit.
 model NotificationLog {
-  id              String              @id @default(uuid()) 
-  templateId      String?             
+  id              String    @id @default(uuid())
+  templateId      String?
   eventCode       String
   channel         String
-  recipientUserId String?             
+  /// The application this message was about, when it was about one. Denormalised
+  /// from the outbox event rather than joined through the recipient, because a
+  /// delivery register has to be answerable by file — "what were we told about
+  /// this application" is the commonest question asked of it.
+  applicationId   String?
+  recipientUserId String?
   /// Email address or msisdn, exactly as sent.
   recipient       String
-  subject         String              @default("")
+  subject         String    @default("")
   body            String
-  status          String @default("QUEUED")
-  provider        String              @default("")
-  providerRef     String              @default("")
-  errorMessage    String              @default("")
-  attempts        Int                 @default(0)
+  status          String    @default("QUEUED")
+  provider        String    @default("")
+  providerRef     String    @default("")
+  errorMessage    String    @default("")
+  attempts        Int       @default(0)
   sentAt          DateTime?
-  createdAt       DateTime            @default(now())
+  createdAt       DateTime  @default(now())
 
-  template NotificationTemplate? @relation(fields: [templateId], references: [id])
+  template      NotificationTemplate? @relation(fields: [templateId], references: [id])
+  /// SetNull rather than Cascade: a delivery record outlives the account it was
+  /// sent to. Removing a user must not erase the evidence that they were told
+  /// something, which is the whole point of keeping a delivery register.
+  recipientUser User?                 @relation(fields: [recipientUserId], references: [id], onDelete: SetNull)
+  application   Application?          @relation(fields: [applicationId], references: [id], onDelete: SetNull)
 
   @@index([eventCode, createdAt])
   @@index([status, attempts])
   @@index([status])
+  @@index([applicationId, createdAt])
   @@map("notification_logs")
 }
 
 model NotificationPreference {
-  userId    String              
+  userId    String
   eventCode String
   channel   String
-  enabled   Boolean             @default(true)
+  enabled   Boolean @default(true)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1867,23 +2253,23 @@ model NotificationPreference {
 // ═══════════════════════════════════════════════════════════════════════════
 
 model ApprovalOrder {
-  id               String      @id @default(uuid()) 
-  applicationId    String      @unique 
-  orderNumber      String      @unique
-  status           String @default("DRAFT")
-  issuedById       String      
-  issuedAt         DateTime    @default(now())
+  id               String    @id @default(uuid())
+  applicationId    String    @unique
+  orderNumber      String    @unique
+  status           String    @default("DRAFT")
+  issuedById       String
+  issuedAt         DateTime  @default(now())
   validUntil       DateTime?
-  conditions       Json         @default(dbgenerated("'[]'"))
-  storageKey       String      @default("")
+  conditions       Json      @default(dbgenerated("'[]'"))
+  storageKey       String    @default("")
   /// Frozen copy of everything printed on the order.
-  snapshot         Json         @default(dbgenerated("'{}'"))
+  snapshot         Json      @default(dbgenerated("'{}'"))
   /// Public verification token behind /verify-order/[code].
-  verificationCode String      @unique
+  verificationCode String    @unique
   /// Reserved for a future DSC / eSign integration (open question S3).
-  signatureRef     String      @default("")
+  signatureRef     String    @default("")
   revokedAt        DateTime?
-  revokeReason     String      @default("")
+  revokeReason     String    @default("")
 
   application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 
@@ -1897,14 +2283,14 @@ model ApprovalOrder {
 /// Append-only and hash-chained. The application DB role is granted INSERT and
 /// SELECT only — see the constraints migration.
 model AuditLog {
-  id Int @id @default(autoincrement()) 
-  actorId       String?  
+  id            Int      @id @default(autoincrement())
+  actorId       String?
   actorName     String   @default("")
   actorRoleKey  String   @default("")
   action        String
   entityType    String
   entityId      String
-  applicationId String?  
+  applicationId String?
   before        Json?
   after         Json?
   remarks       String   @default("")
@@ -1921,7 +2307,7 @@ model AuditLog {
   /// `occurredAt` is a millisecond timestamp that rows routinely tie on, and
   /// two rows in the same millisecond can be read in either order — which
   /// would report a break in a chain that was intact.
-  seq Int @unique @default(0)
+  seq           Int      @unique @default(0)
 
   @@index([entityType, entityId])
   @@index([applicationId, occurredAt])
@@ -1932,32 +2318,487 @@ model AuditLog {
 }
 
 model SystemSetting {
-  id          String      @id @default(uuid()) 
-  key         String      @unique
+  id          String   @id @default(uuid())
+  key         String   @unique
   value       String
-  type        String @default("STRING")
-  group       String      @default("general")
-  label       String      @default("")
-  description String      @default("")
+  type        String   @default("STRING")
+  group       String   @default("general")
+  label       String   @default("")
+  description String   @default("")
   /// Never serialised to a client.
-  isSecret    Boolean     @default(false)
-  updatedAt   DateTime    @updatedAt
-  updatedById String?     
+  isSecret    Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+  updatedById String?
 
   @@index([group])
   @@map("system_settings")
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// 11. SITE INSPECTION
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// One visit to the site by the inspecting TPA — TPA manual §5.8.
+///
+/// ── One row per ROUND, never re-used ──────────────────────────────────────
+///
+/// A file can be inspected more than once: the report raises a shortfall, the
+/// applicant corrects the site, and the TPA goes back. The second visit is a
+/// second row with `round = 2`. The first report is signed, and a signed
+/// report is never edited — so a re-inspection cannot be expressed as an
+/// update to it without destroying the thing the signature was over.
+///
+/// ── Why the wording of each question is copied onto the response ─────────
+///
+/// The 27 questions are configuration (`checklist_item_definitions`, kind
+/// SITE_INSPECTION) and they are PROVISIONAL DEMO WORDING — the manuals do not
+/// reproduce them as text, so an administrator will replace them. A report
+/// signed today must still read tomorrow exactly as it did when it was
+/// signed, which is only true if the question the inspector answered travels
+/// with the answer. See SiteInspectionResponse.
+///
+/// ── The workflow link ─────────────────────────────────────────────────────
+///
+/// Scheduling and submission are each ONE transaction with a workflow
+/// transition (`SCHEDULE_SITE_INSPECTION`, `SUBMIT_SITE_INSPECTION`,
+/// `RAISE_INSPECTION_SHORTFALL`). `scheduleSequence` and `submitSequence`
+/// name the `workflow_history` rows those transitions wrote, so the movement
+/// history and the inspection each point at the other.
+model SiteInspection {
+  id               String @id @default(uuid())
+  /// SI/2026/000001 — allocated in the scheduling transaction, gap-free.
+  inspectionNumber String @unique
+  applicationId    String
+  round            Int    @default(1)
+
+  /// SCHEDULED | IN_PROGRESS | SUBMITTED — src/lib/site-inspection.ts.
+  status String @default("SCHEDULED")
+
+  // ── Who and when ─────────────────────────────────────────────────────
+  inspectorId     String
+  inspectorName   String
+  scheduledById   String?
+  scheduledByName String    @default("")
+  /// The date the visit is booked for.
+  scheduledFor    DateTime
+  scheduleRemarks String    @default("")
+  /// The date the visit actually happened, as recorded by the inspector.
+  inspectedAt     DateTime?
+  /// The desk the file was at when this was scheduled.
+  stageCode       String    @default("")
+
+  // ── Where ────────────────────────────────────────────────────────────
+  /// DEMO COORDINATES. No GPS is read from any device; see
+  /// `demoSiteLocation()`. `locationSource` says so on every row.
+  latitude       Float?
+  longitude      Float?
+  locationSource String @default("DEMO")
+  siteAddress    String @default("")
+
+  generalObservation String @default("")
+
+  // ── The finding ──────────────────────────────────────────────────────
+  /// RECOMMENDED | SHORTFALL | REJECT. Empty until the inspector decides.
+  recommendation        String @default("")
+  recommendationRemarks String @default("")
+
+  // ── The signature (DEMO) ─────────────────────────────────────────────
+  /// AADHAAR_ESIGN_DEMO | USB_TOKEN_DEMO. Neither is a real signature.
+  signatureMethod   String    @default("")
+  signedById        String?
+  signedByName      String    @default("")
+  signedByRoleKey   String    @default("")
+  signedAt          DateTime?
+  /// Demo transaction reference, e.g. ESIGN-DEMO-7F3A…
+  signatureRef      String    @default("")
+  /// SHA-256 over the canonical report. Recomputing it from the rows proves
+  /// the report has not changed since it was signed.
+  documentHash      String    @default("")
+  /// Everything else the demo provider "returned" — certificate subject,
+  /// masked Aadhaar, token serial. Shown on the report, never trusted.
+  signatureMetadata Json      @default(dbgenerated("'{}'"))
+
+  submittedAt DateTime?
+  /// Set with `submittedAt`. A locked inspection accepts no write of any kind.
+  lockedAt    DateTime?
+
+  // ── The workflow link ────────────────────────────────────────────────
+  scheduleSequence Int?
+  scheduleLinkedAt DateTime?
+  submitSequence   Int?
+  routedAt         DateTime?
+  routedActionCode String    @default("")
+  /// The shortfall this report raised, when its recommendation was SHORTFALL.
+  shortfallId      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  application Application              @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  inspector   User                     @relation("SiteInspectionInspector", fields: [inspectorId], references: [id])
+  responses   SiteInspectionResponse[]
+  photos      SiteInspectionPhoto[]
+
+  @@unique([applicationId, round])
+  @@index([status, scheduledFor])
+  @@index([inspectorId, status])
+  @@index([recommendation])
+  @@map("site_inspections")
+}
+
+/// One question of the 27, answered on site.
+///
+/// `question`, `category` and `isProvisional` are SNAPSHOTS of the definition
+/// as it stood when the answer was written. The definition row is editable
+/// and is expected to be edited — the provisional wording is replaced once
+/// the official text is available — and a signed report must not change
+/// underneath its signature when that happens.
+model SiteInspectionResponse {
+  id           String @id @default(uuid())
+  inspectionId String
+  itemId       String
+  itemNumber   Int
+
+  question      String
+  category      String  @default("")
+  responseType  String  @default("YES_NO_NA")
+  isMandatory   Boolean @default(true)
+  isProvisional Boolean @default(true)
+
+  /// YES | NO | NA, or free text / a number for the other response types.
+  response    String @default("")
+  /// What was seen on the ground.
+  observation String @default("")
+  remarks     String @default("")
+  /// PENDING | SATISFACTORY | SHORTFALL | OBJECTION | NA.
+  status      String @default("PENDING")
+
+  answeredById String?
+  answeredAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  inspection SiteInspection          @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  item       ChecklistItemDefinition @relation(fields: [itemId], references: [id])
+
+  @@unique([inspectionId, itemId])
+  @@index([inspectionId, itemNumber])
+  @@map("site_inspection_responses")
+}
+
+/// A geo-tagged photograph taken at the site.
+///
+/// The coordinates and the capture time are what make it evidence rather than
+/// a picture, so they are REQUIRED. In this demonstration they are DEMO
+/// coordinates entered with the photo — no EXIF is parsed and no device GPS
+/// is read — and `isDemoLocation` records that on the row itself.
+///
+/// `fileObjectId` is a plain id, not a relation, for the same reason
+/// `documentId` is on checklist responses: the photograph references a stored
+/// file, and the lifecycle of the file is the storage layer's business. A row
+/// with no file is a seeded demo photograph, rendered as a labelled
+/// placeholder by the image route.
+model SiteInspectionPhoto {
+  id            String @id @default(uuid())
+  inspectionId  String
+  applicationId String
+
+  /// NORTH | SOUTH | EAST | WEST | ACCESS_ROAD | BOUNDARY | ENCUMBRANCE |
+  /// EXISTING_STRUCTURE | OTHER
+  category    String
+  description String @default("")
+
+  fileObjectId String?
+  fileName     String  @default("")
+  mimeType     String  @default("")
+  sizeBytes    Int     @default(0)
+
+  latitude       Float
+  longitude      Float
+  capturedAt     DateTime
+  isDemoLocation Boolean  @default(true)
+
+  uploadedById   String
+  uploadedByName String   @default("")
+  uploadedAt     DateTime @default(now())
+
+  inspection SiteInspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  @@index([inspectionId, category])
+  @@index([applicationId])
+  @@map("site_inspection_photos")
+}
+
+/// The statutory checklists, as configuration.
+///
+/// Two of them today:
+///
+///   APPLICATION       the 19-point checklist the LTP answers and the TPA,
+///                     Planning Officer, ZDD and ZJD verify
+///   SITE_INSPECTION   the 27-point checklist the TPA completes on site
+///
+/// ── Why the wording is a row and not a constant ──────────────────────────
+///
+/// THE OFFICIAL WORDING IS NOT YET AVAILABLE. The four BBAS manuals describe
+/// both checklists and show them in screenshots, but neither reproduces the
+/// questions as text — the TPA manual says only that questions 1 to 10 cover
+/// "ownership validity, encumbrance status, master plan zoning, and layout
+/// compliance", and so on. Inventing sentences and presenting them as
+/// statutory requirements would be worse than useless.
+///
+/// So every question carries `isProvisional`, and while it is true the
+/// interface says so wherever the question is shown. The wording is editable
+/// from the administration screens, which means replacing it when the official
+/// text arrives is a data change — no migration, no deployment, no code.
+///
+/// Responses are NOT modelled here. They arrive with the modules that collect
+/// them (the application checklist tab, the site inspection subsystem) and
+/// will reference these rows.
+model ChecklistItemDefinition {
+  id String @id @default(uuid())
+
+  /// APPLICATION | SITE_INSPECTION
+  kind       String
+  /// The number the question is known by — "question 14". Stable, and separate
+  /// from `displayOrder` so a checklist can be reordered without renumbering
+  /// questions that officers and letters refer to by number.
+  itemNumber Int
+
+  question    String
+  description String @default("")
+
+  /// YES_NO | YES_NO_NA | TEXT | NUMBER | MEASUREMENT
+  responseType String @default("YES_NO_NA")
+  /// Groups the items into sections on screen. Free text, administrator-set.
+  category     String @default("")
+  helpText     String @default("")
+
+  isMandatory      Boolean @default(true)
+  /// The answer is expected to be backed by an uploaded document.
+  requiresDocument Boolean @default(false)
+  /// The answer feeds the application's risk category.
+  affectsRisk      Boolean @default(false)
+
+  displayOrder Int     @default(0)
+  isActive     Boolean @default(true)
+
+  /// True while this is demo wording rather than the official BBAS question.
+  /// Surfaced in the interface; set to false when the real text is entered.
+  isProvisional Boolean @default(true)
+  /// Where the wording came from — a manual section, a rule, or the note that
+  /// it is provisional. Shown to the administrator editing it.
+  source        String  @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  responses           ApplicationChecklistResponse[]
+  inspectionResponses SiteInspectionResponse[]
+
+  @@unique([kind, itemNumber])
+  @@index([kind, isActive, displayOrder])
+  @@map("checklist_item_definitions")
+}
+
+/// One application's answer to one checklist question.
+///
+/// ── Why there are two responses on one row ──────────────────────────────
+///
+/// `response` is the APPLICANT'S answer and `reviewerResponse` is the
+/// REVIEWER'S. They are separate columns and never overwrite one another,
+/// because the interesting case is the one where they DIFFER: the LTP
+/// answered "yes, the encumbrance certificate is enclosed" and the TPA found
+/// it expired. A single column would record only the last person to type,
+/// and the disagreement — which is the entire reason an officer reviews a
+/// checklist — would be invisible the moment it was resolved.
+///
+/// ── Why this row is not the record ──────────────────────────────────────
+///
+/// This row is the CURRENT state, for reading cheaply. The record is
+/// `checklist_review_entries`, which is append-only: every answer and every
+/// verification is written there first and nothing is ever updated or
+/// deleted. A ZDD who verifies a question the TPA marked SHORTFALL changes
+/// what this row says and cannot touch what the TPA said — that history is a
+/// different table with no update path. See reviewChecklist() in
+/// src/server/services/application-checklist.ts.
+///
+/// `itemNumber` is denormalised on purpose. Officers, letters and shortfall
+/// items refer to "question 14", and this answer must still be nameable as
+/// question 14 after the definition row has been edited.
+model ApplicationChecklistResponse {
+  id            String @id @default(uuid())
+  applicationId String
+  itemId        String
+  itemNumber    Int
+  /// APPLICATION | SITE_INSPECTION. Copied from the definition so the
+  /// application's checklists can be counted apart without a join.
+  kind          String @default("APPLICATION")
+
+  // ── The applicant's side ────────────────────────────────────────────
+  /// The answer, in the vocabulary the question's responseType implies:
+  /// YES | NO | NA for the yes/no kinds, free text or a number as a string
+  /// for the others. Empty means UNANSWERED, which is what a new file is.
+  response         String    @default("")
+  applicantRemarks String    @default("")
+  respondedById    String?
+  respondedByName  String    @default("")
+  respondedAt      DateTime?
+
+  // ── The reviewer's side: the CURRENT verification ────────────────────
+  reviewerResponse  String    @default("")
+  reviewerRemarks   String    @default("")
+  /// PENDING | VERIFIED | SHORTFALL | REJECTED | NA — src/lib/checklist.ts.
+  status            String    @default("PENDING")
+  reviewedById      String?
+  reviewedByName    String    @default("")
+  reviewedRoleKey   String    @default("")
+  /// Which desk the verification was made at. Two desks reviewing the same
+  /// question is normal and the screen shows both; without this the second
+  /// one is indistinguishable from a correction of the first.
+  reviewedStageCode String    @default("")
+  reviewedAt        DateTime?
+
+  /// The document offered in support, where the question calls for one. A
+  /// plain id and not a relation, exactly as `shortfallItemId` is on
+  /// `application_documents`: the reference is informational and must not
+  /// cascade a document deletion into the checklist.
+  documentId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  application Application             @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  item        ChecklistItemDefinition @relation(fields: [itemId], references: [id])
+  entries     ChecklistReviewEntry[]
+
+  @@unique([applicationId, itemId])
+  @@index([applicationId, kind, itemNumber])
+  @@index([applicationId, status])
+  @@map("application_checklist_responses")
+}
+
+/// APPEND-ONLY. Every answer and every verification, in the order they
+/// happened.
+///
+/// This table is the answer to "do not allow later reviewers to erase
+/// previous responses". Not a convention and not a code path that could be
+/// forgotten: there is no update and no delete anywhere in the service, the
+/// screen reads this table for the history it shows beside each question,
+/// and the application DB role has UPDATE and DELETE revoked on it by the
+/// same constraints migration that protects `audit_logs` and
+/// `workflow_history`.
+///
+/// A ZDD may reach a different conclusion from the TPA — that is what review
+/// is for — and when they do, both conclusions are on the file with the desk
+/// and the officer who reached each one.
+model ChecklistReviewEntry {
+  id            String @id @default(uuid())
+  responseId    String
+  applicationId String
+  itemNumber    Int
+
+  /// APPLICANT_RESPONSE | REVIEW
+  entryType String
+  response  String @default("")
+  remarks   String @default("")
+  /// The status set by this entry. Empty on an applicant's answer — an
+  /// applicant states facts, they do not verify them.
+  status    String @default("")
+
+  actorId      String?
+  actorName    String  @default("")
+  actorRoleKey String  @default("")
+  stageCode    String  @default("")
+
+  recordedAt DateTime @default(now())
+
+  response_   ApplicationChecklistResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  application Application                  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, itemNumber, recordedAt])
+  @@index([responseId, recordedAt])
+  @@map("checklist_review_entries")
+}
+
+/// The BBAS "Others" block — the six undertakings that travel with a building
+/// permission but belong to none of the other tabs.
+///
+/// One row per application, created on demand. Every group follows the same
+/// three-part shape wherever BBAS uses it — REQUIRED (the rule says so),
+/// PROPOSED (the applicant says they will) and PROVIDED/INSTALLED (it is
+/// there) — and the three are kept apart because the gap between them is the
+/// whole point. A solar installation that is required and proposed and not
+/// installed is the ordinary state of an application under consideration; one
+/// that is required and not proposed is a shortfall. Collapsing them into a
+/// single "solar: yes" would make those two indistinguishable.
+model ApplicationOthers {
+  id            String @id @default(uuid())
+  applicationId String @unique
+
+  // ── Mortgage ─────────────────────────────────────────────────────────
+  /// The portion of the building mortgaged to the sanctioning authority as
+  /// security, and the registration particulars of that deed.
+  mortgageApplicable   Boolean   @default(false)
+  mortgageNumber       String    @default("")
+  mortgageDate         DateTime?
+  mortgageSubRegistrar String    @default("")
+  /// Which floors or which portion was handed over, as written in the deed.
+  mortgagePortion      String    @default("")
+  mortgageAreaSqm      Float?
+  mortgageDocumentId   String?
+
+  // ── Car insurance ────────────────────────────────────────────────────
+  insuranceApplicable   Boolean   @default(false)
+  insurancePolicyNumber String    @default("")
+  insuranceDate         DateTime?
+  insuranceValidUpto    DateTime?
+  insuranceDocumentId   String?
+
+  // ── Solar ────────────────────────────────────────────────────────────
+  solarRequired   Boolean @default(false)
+  solarProposed   Boolean @default(false)
+  solarInstalled  Boolean @default(false)
+  solarCapacityKw Float?
+  solarRemarks    String  @default("")
+
+  // ── Rainwater harvesting ─────────────────────────────────────────────
+  rwhRequired Boolean @default(false)
+  rwhProposed Boolean @default(false)
+  rwhProvided Boolean @default(false)
+  rwhRemarks  String  @default("")
+
+  // ── Greening and trees ───────────────────────────────────────────────
+  greeningRequired Boolean @default(false)
+  greeningProposed Boolean @default(false)
+  greeningProvided Boolean @default(false)
+  /// Trees on the plot. NULL means not counted, which is not the same as a
+  /// counted zero on a bare plot.
+  treeCount        Int?
+  greeningRemarks  String  @default("")
+
+  /// Anything about this file that belongs on the permission and fits none of
+  /// the headings above.
+  specialRemarks String @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@map("application_others")
+}
+
 /// Administrator-extensible lists — land use, occupancy, structure type.
 /// Extending one must never need a migration.
 model MasterData {
-  id           String   @id @default(uuid()) 
+  id           String   @id @default(uuid())
   category     String
   code         String
   label        String
   parentCode   String?
   displayOrder Int      @default(0)
-  metadata     Json      @default(dbgenerated("'{}'"))
+  metadata     Json     @default(dbgenerated("'{}'"))
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -1971,9 +2812,9 @@ model MasterData {
 /// by the worker. This is what guarantees an officer's action and the
 /// applicant's SMS cannot diverge.
 model OutboxEvent {
-  id            String    @id @default(uuid()) 
+  id            String    @id @default(uuid())
   eventCode     String
-  applicationId String?   
+  applicationId String?
   payload       Json
   processed     Boolean   @default(false)
   processedAt   DateTime?
@@ -1986,10 +2827,10 @@ model OutboxEvent {
 }
 
 model Job {
-  id          String    @id @default(uuid()) 
+  id          String    @id @default(uuid())
   type        String
-  payload     Json       @default(dbgenerated("'{}'"))
-  status      String @default("PENDING")
+  payload     Json      @default(dbgenerated("'{}'"))
+  status      String    @default("PENDING")
   runAt       DateTime  @default(now())
   attempts    Int       @default(0)
   maxAttempts Int       @default(5)
@@ -2003,4 +2844,705 @@ model Job {
 
   @@index([status, runAt])
   @@map("jobs")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NOCs — no-objection certificates from external authorities
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// A KIND of NOC, as configuration: Fire today; Airport, Railway, Environment,
+/// Water Resources, Heritage and Other are seeded INACTIVE and switched on by
+/// data, not code.
+///
+/// ── No legal thresholds live here ─────────────────────────────────────────
+///
+/// Whether a NOC is needed on a particular file is DECIDED BY THE REVIEWING
+/// OFFICER and recorded on `application_nocs.isRequired`. Nothing computes it
+/// from height, area or use. `suggestedByChecklistItems` only points at
+/// application checklist questions whose YES answer is worth showing next to
+/// that decision — the checklist wording itself is provisional (see
+/// 12-checklists.ts) and a suggestion never marks anything required.
+model NocType {
+  id                        String  @id @default(uuid())
+  /// FIRE | AIRPORT | RAILWAY | ENVIRONMENT | WATER_RESOURCES | HERITAGE | OTHER
+  code                      String  @unique
+  name                      String
+  /// The authority that ordinarily issues it. Copied onto each NOC, where it
+  /// can be corrected for that file.
+  authority                 String  @default("")
+  description               String  @default("")
+  /// The document catalogue entry that matches it, e.g. FIRE_NOC. Informational.
+  documentTypeCode          String  @default("")
+  /// Application checklist item numbers (kind APPLICATION) whose YES answer
+  /// suggests this NOC may apply. Never decisive.
+  suggestedByChecklistItems Json    @default(dbgenerated("'[]'"))
+  /// Whether the certificate carries a validity date the verifier must see.
+  requiresExpiry            Boolean @default(true)
+  isActive                  Boolean @default(true)
+  displayOrder              Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  nocs ApplicationNoc[]
+
+  @@index([isActive, displayOrder])
+  @@map("noc_types")
+}
+
+/// One NOC on one application. At most one per type per application.
+///
+/// Status vocabulary and the legal moves between statuses are in
+/// src/lib/noc.ts. The applicant records the application to the authority and
+/// the certificate received; the desk the file is at verifies, rejects, raises
+/// a shortfall or marks it not required.
+model ApplicationNoc {
+  id            String @id @default(uuid())
+  /// NOC/2026/000001 — gap-free, allocated in the creating transaction.
+  nocNumber     String @unique
+  applicationId String
+  nocTypeId     String
+
+  /// NOT_REQUIRED | REQUIRED | PENDING | APPLIED | RECEIVED | VERIFIED |
+  /// SHORTFALL | REJECTED | EXPIRED
+  status     String   @default("PENDING")
+  /// Null until an officer determines it. PENDING rows are undetermined.
+  isRequired Boolean?
+
+  authority            String    @default("")
+  /// The applicant's reference with the authority (the application number there).
+  applicationReference String    @default("")
+  /// The NOC's own number, as printed on the certificate.
+  referenceNumber      String    @default("")
+  appliedDate          DateTime?
+  issuedDate           DateTime?
+  expiryDate           DateTime?
+
+  // ── The certificate ──────────────────────────────────────────────────
+  /// A stored upload. Null with `isDemoDocument` for a demo placeholder.
+  fileObjectId    String?
+  fileName        String    @default("")
+  mimeType        String    @default("")
+  sizeBytes       Int       @default(0)
+  isDemoDocument  Boolean   @default(false)
+  documentAddedAt DateTime?
+
+  // ── Verification ─────────────────────────────────────────────────────
+  verifiedById      String?
+  verifiedByName    String    @default("")
+  verifiedByRoleKey String    @default("")
+  verifiedAt        DateTime?
+  /// The desk the file was at when an officer last decided on this NOC.
+  reviewedStageCode String    @default("")
+  /// The latest officer remarks — the shortfall asked, the reason for rejection.
+  remarks           String    @default("")
+  applicantRemarks  String    @default("")
+
+  createdById   String?
+  createdByName String   @default("")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  application Application           @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  nocType     NocType               @relation(fields: [nocTypeId], references: [id])
+  events      ApplicationNocEvent[]
+
+  @@unique([applicationId, nocTypeId])
+  @@index([status])
+  @@index([nocTypeId, status])
+  @@index([expiryDate])
+  @@map("application_nocs")
+}
+
+/// The lifecycle of one NOC, one row per move. Append-only by convention;
+/// the audit chain carries the same facts tamper-evidently.
+model ApplicationNocEvent {
+  id           String   @id @default(uuid())
+  nocId        String
+  /// CREATED | MARK_REQUIRED | MARK_NOT_REQUIRED | RECORD_APPLICATION |
+  /// RECORD_RECEIPT | VERIFY | REJECT | SHORTFALL | EXPIRE
+  action       String
+  fromStatus   String   @default("")
+  toStatus     String
+  actorId      String?
+  actorName    String   @default("")
+  actorRoleKey String   @default("")
+  stageCode    String   @default("")
+  remarks      String   @default("")
+  occurredAt   DateTime @default(now())
+
+  noc ApplicationNoc @relation(fields: [nocId], references: [id], onDelete: Cascade)
+
+  @@index([nocId, occurredAt])
+  @@map("application_noc_events")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 16. PROCEEDINGS — SHOW CAUSE, REVOCATION, OUTWARD
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Three registers, deliberately separate from shortfalls. A shortfall asks the
+// applicant for something the file lacks; a show cause notice asks them to
+// explain something the department believes is wrong. They share no table, no
+// number series, no status and no code path — see src/lib/show-cause.ts.
+//
+// Every officer decision on a show cause or a revocation is performed by the
+// WORKFLOW ENGINE (a transition whose effect writes these rows), so who may
+// issue, decide or revoke is `workflow_transitions` configuration, never code.
+
+/// One show cause notice. Vocabulary and legal moves: src/lib/show-cause.ts.
+model ShowCauseNotice {
+  id            String @id @default(uuid())
+  /// SCN/2026/000001 — its own series, never a shortfall number.
+  noticeNumber  String @unique
+  applicationId String
+
+  /// ISSUED | AWAITING_RESPONSE | RESPONDED | UNDER_REVIEW | CLOSED |
+  /// FURTHER_ACTION | REJECTED | REFERRED_FOR_REVOCATION
+  status String @default("ISSUED")
+
+  /// Why the notice is being issued — the officer's own words.
+  reason          String
+  /// The contravention alleged, as stated on the notice.
+  violation       String
+  /// The response window stated on the notice. Informational: nothing happens
+  /// automatically when it passes.
+  responseDueDate DateTime
+
+  /// Demo attachments: [{ fileObjectId|null, fileName, mimeType, sizeBytes, isDemo }]
+  supportingDocuments Json @default(dbgenerated("'[]'"))
+
+  issuedById      String?
+  issuedByName    String   @default("")
+  issuedByRoleKey String   @default("")
+  /// The desk the file was at when the notice was issued.
+  issuedStageCode String   @default("")
+  issuedAt        DateTime @default(now())
+  /// The workflow history row that issued it.
+  issueSequence   Int?
+
+  // ── The applicant's response ────────────────────────────────────────
+  responseText      String    @default("")
+  responseDocuments Json      @default(dbgenerated("'[]'"))
+  respondedById     String?
+  respondedByName   String    @default("")
+  respondedAt       DateTime?
+
+  // ── The review and the decision ─────────────────────────────────────
+  reviewerId       String?
+  reviewerName     String    @default("")
+  reviewerRoleKey  String    @default("")
+  reviewStartedAt  DateTime?
+  /// CLOSED_SATISFACTORY | FURTHER_ACTION_REQUIRED | REJECTED | REVOKE_PROCEEDING
+  decision         String    @default("")
+  decisionRemarks  String    @default("")
+  decidedById      String?
+  decidedByName    String    @default("")
+  decidedByRoleKey String    @default("")
+  decidedAt        DateTime?
+  decisionSequence Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  application Application            @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  events      ShowCauseEvent[]
+  revocations RevocationProceeding[]
+
+  @@index([applicationId])
+  @@index([status])
+  @@map("show_cause_notices")
+}
+
+/// Append-only by convention; the audit chain carries the same facts.
+model ShowCauseEvent {
+  id           String   @id @default(uuid())
+  showCauseId  String
+  action       String
+  fromStatus   String   @default("")
+  toStatus     String
+  actorId      String?
+  actorName    String   @default("")
+  actorRoleKey String   @default("")
+  stageCode    String   @default("")
+  remarks      String   @default("")
+  occurredAt   DateTime @default(now())
+
+  showCause ShowCauseNotice @relation(fields: [showCauseId], references: [id], onDelete: Cascade)
+
+  @@index([showCauseId, occurredAt])
+  @@map("show_cause_events")
+}
+
+/// A proceeding to revoke a granted permission (the BPO).
+/// PROPOSED → UNDER_REVIEW → REVOKED | REJECTED. See src/lib/revocation.ts.
+model RevocationProceeding {
+  id               String  @id @default(uuid())
+  /// REV/2026/000001
+  revocationNumber String  @unique
+  applicationId    String
+  /// The show cause whose decision referred the file here, when there was one.
+  showCauseId      String?
+  /// The BPO being proceeded against, frozen at initiation.
+  orderNumber      String  @default("")
+
+  status  String @default("PROPOSED")
+  reason  String
+  /// The grounds, one per line as stated by the initiating officer.
+  grounds Json   @default(dbgenerated("'[]'"))
+
+  initiatedById      String?
+  initiatedByName    String   @default("")
+  initiatedByRoleKey String   @default("")
+  initiatedAt        DateTime @default(now())
+
+  reviewerId      String?
+  reviewerName    String    @default("")
+  reviewerRoleKey String    @default("")
+  reviewStartedAt DateTime?
+
+  /// REVOKED | REJECTED
+  decision         String    @default("")
+  decisionRemarks  String    @default("")
+  decidedById      String?
+  decidedByName    String    @default("")
+  decidedByRoleKey String    @default("")
+  decidedAt        DateTime?
+
+  /// ROR/2026/000001 — the revocation order, generated only on REVOKED.
+  revocationOrderNumber String    @default("")
+  orderGeneratedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  application Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  showCause   ShowCauseNotice?  @relation(fields: [showCauseId], references: [id])
+  events      RevocationEvent[]
+
+  @@index([applicationId])
+  @@index([status])
+  @@map("revocation_proceedings")
+}
+
+model RevocationEvent {
+  id           String   @id @default(uuid())
+  revocationId String
+  action       String
+  fromStatus   String   @default("")
+  toStatus     String
+  actorId      String?
+  actorName    String   @default("")
+  actorRoleKey String   @default("")
+  stageCode    String   @default("")
+  remarks      String   @default("")
+  occurredAt   DateTime @default(now())
+
+  revocation RevocationProceeding @relation(fields: [revocationId], references: [id], onDelete: Cascade)
+
+  @@index([revocationId, occurredAt])
+  @@map("revocation_events")
+}
+
+/// The outward (dispatch) register. One row per document leaving the office.
+/// Vocabulary and legal moves: src/lib/outward.ts.
+model OutwardEntry {
+  id            String  @id @default(uuid())
+  /// OUT/2026/000001
+  outwardNumber String  @unique
+  applicationId String?
+
+  /// BPO | SHORTFALL_LETTER | SHOW_CAUSE_NOTICE | REVOCATION_ORDER |
+  /// REGISTRATION_LETTER | OCCUPANCY_CERTIFICATE | OTHER
+  documentType      String
+  /// The number printed on the document itself — SCN/…, ROR/…, BP/…
+  documentReference String @default("")
+  /// ShowCauseNotice | RevocationProceeding | ApprovalOrder | Shortfall | ""
+  sourceType        String @default("")
+  sourceId          String @default("")
+  subject           String @default("")
+
+  recipient String
+  address   String @default("")
+
+  /// DRAFT | READY_FOR_DISPATCH | DISPATCHED | DELIVERED | ACKNOWLEDGED | RETURNED | CANCELLED
+  status              String    @default("DRAFT")
+  assignedDate        DateTime  @default(now())
+  dispatchDate        DateTime?
+  /// BY_HAND | REGISTERED_POST | SPEED_POST | COURIER | EMAIL | PORTAL
+  mode                String    @default("")
+  trackingNumber      String    @default("")
+  deliveredAt         DateTime?
+  returnedAt          DateTime?
+  returnReason        String    @default("")
+  /// Who acknowledged receipt, and how ("Signed receipt — owner").
+  acknowledgement     String    @default("")
+  acknowledgementDate DateTime?
+  remarks             String    @default("")
+
+  createdById   String?
+  createdByName String   @default("")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  application Application?   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  events      OutwardEvent[]
+
+  @@index([applicationId])
+  @@index([status])
+  @@index([documentType, status])
+  @@index([sourceType, sourceId])
+  @@map("outward_entries")
+}
+
+model OutwardEvent {
+  id           String   @id @default(uuid())
+  outwardId    String
+  action       String
+  fromStatus   String   @default("")
+  toStatus     String
+  actorId      String?
+  actorName    String   @default("")
+  actorRoleKey String   @default("")
+  remarks      String   @default("")
+  occurredAt   DateTime @default(now())
+
+  outward OutwardEntry @relation(fields: [outwardId], references: [id], onDelete: Cascade)
+
+  @@index([outwardId, occurredAt])
+  @@map("outward_events")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Change of technical professional (Phase 8). See src/lib/professional-change.ts.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// A request to replace the technical professional (LTP) on a file.
+/// PENDING_VERIFICATION → UNDER_REVIEW → PENDING_DECISION → APPROVED | REJECTED.
+model ProfessionalChangeRequest {
+  id            String @id @default(uuid())
+  /// TPC/2026/000001
+  requestNumber String @unique
+  applicationId String
+  status        String @default("PENDING_VERIFICATION")
+
+  /// Who held the file when the request was made, and who is proposed.
+  /// The snapshots freeze licence, class, validity and firm as they stood.
+  currentProfessionalId  String
+  currentSnapshot        Json   @default(dbgenerated("'{}'"))
+  proposedProfessionalId String
+  proposedSnapshot       Json   @default(dbgenerated("'{}'"))
+
+  /// The owner making the request, as the file names them at that moment.
+  ownerName   String   @default("")
+  /// The date on the owner's request letter.
+  requestDate DateTime
+  reason      String
+  /// [{ kind, fileObjectId|null, fileName, mimeType, sizeBytes, isDemo, addedAt, addedByName }]
+  documents   Json     @default(dbgenerated("'[]'"))
+
+  /// The role whose step is next, recorded at each move. Empty once decided.
+  currentDeskRoleKey String @default("")
+
+  requestedById      String?
+  requestedByName    String   @default("")
+  requestedByRoleKey String   @default("")
+  /// The stage the file was at when the request was registered.
+  requestedStageCode String   @default("")
+  requestedAt        DateTime @default(now())
+  requestSequence    Int?
+
+  verifiedById        String?
+  verifiedByName      String    @default("")
+  verifiedByRoleKey   String    @default("")
+  verifiedAt          DateTime?
+  verificationRemarks String    @default("")
+
+  reviewedById      String?
+  reviewedByName    String    @default("")
+  reviewedByRoleKey String    @default("")
+  reviewedAt        DateTime?
+  reviewRemarks     String    @default("")
+
+  /// APPROVED | REJECTED
+  decision         String    @default("")
+  decisionRemarks  String    @default("")
+  decidedById      String?
+  decidedByName    String    @default("")
+  decidedByRoleKey String    @default("")
+  decidedAt        DateTime?
+  decisionSequence Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  application          Application               @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  currentProfessional  User                      @relation("ProfessionalChangeCurrent", fields: [currentProfessionalId], references: [id])
+  proposedProfessional User                      @relation("ProfessionalChangeProposed", fields: [proposedProfessionalId], references: [id])
+  events               ProfessionalChangeEvent[]
+
+  @@index([applicationId])
+  @@index([status])
+  @@map("professional_change_requests")
+}
+
+/// Append-only by convention; the audit chain carries the same facts.
+model ProfessionalChangeEvent {
+  id           String   @id @default(uuid())
+  requestId    String
+  action       String
+  fromStatus   String   @default("")
+  toStatus     String
+  actorId      String?
+  actorName    String   @default("")
+  actorRoleKey String   @default("")
+  stageCode    String   @default("")
+  remarks      String   @default("")
+  occurredAt   DateTime @default(now())
+
+  request ProfessionalChangeRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, occurredAt])
+  @@map("professional_change_events")
+}
+
+/// Every technical professional who has held a file, in order. Rows are opened
+/// and closed, never deleted: exactly one is ACTIVE, and it names the same user
+/// as applications.ltpUserId. A file filed before this table existed has no
+/// row until its first change, which writes the original engagement first.
+model ApplicationProfessional {
+  id                     String    @id @default(uuid())
+  applicationId          String
+  userId                 String
+  /// ACTIVE | SUPERSEDED
+  status                 String    @default("ACTIVE")
+  snapshot               Json      @default(dbgenerated("'{}'"))
+  /// Whether this professional may submit drawings on the file.
+  drawingRights          Boolean   @default(true)
+  /// ORIGINAL_FILING | CHANGE_REQUEST
+  source                 String
+  engagedFrom            DateTime
+  engagedUntil           DateTime?
+  /// The approved request that brought this professional in.
+  changeRequestId        String?
+  /// The approved request that replaced them.
+  endedByChangeRequestId String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id])
+
+  @@index([applicationId, status])
+  @@index([userId])
+  @@map("application_professionals")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Commencement of work (Phase 9). See src/lib/commencement.ts.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// The owner's notice that work has started (or will start) under an issued
+/// building permission order. One per file; written only by the workflow
+/// effect WORK_COMMENCEMENT. "Pending commencement" vs "Work initiated" is
+/// derived from commencementDate, never stored.
+model WorkCommencement {
+  id                 String @id @default(uuid())
+  /// WCN/2026/000001
+  commencementNumber String @unique
+  applicationId      String @unique
+  /// NOTIFIED — the one stored state today; room for a later lifecycle.
+  status             String @default("NOTIFIED")
+
+  /// The proceeding worked under, frozen as it stood on the day.
+  approvalOrderId String
+  orderNumber     String
+  orderIssuedAt   DateTime
+  orderValidUntil DateTime?
+
+  ownerName    String @default("")
+  /// The technical professional holding the file when the notice was given.
+  ltpUserId    String
+  ltpName      String @default("")
+  ltpLicenceNo String @default("")
+
+  contractorName      String
+  contractorLicenceNo String @default("")
+  contractorPhone     String @default("")
+  contractorAddress   String @default("")
+
+  /// The day work starts on site. May be later than the notice.
+  commencementDate DateTime
+  /// When the notice was given — the workflow step's moment.
+  notifiedAt       DateTime
+  /// [{ kind, fileObjectId|null, fileName, mimeType, sizeBytes, isDemo, addedAt, addedByName }]
+  documents        Json     @default(dbgenerated("'[]'"))
+  remarks          String   @default("")
+
+  notifiedById      String?
+  notifiedByName    String  @default("")
+  notifiedByRoleKey String  @default("")
+  stageCode         String  @default("")
+  workflowSequence  Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([commencementDate])
+  @@map("work_commencements")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Occupancy (Phase 10). See src/lib/occupancy.ts.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// One application for occupancy on a permitted building. Written only by the
+/// workflow effect OCCUPANCY. At most one is open per file (`isCurrent` marks
+/// the latest); a rejected one may be followed by a fresh one.
+model OccupancyApplication {
+  id              String  @id @default(uuid())
+  /// OCC/2026/000001
+  occupancyNumber String  @unique
+  applicationId   String
+  /// SUBMITTED | INSPECTION_PENDING | INSPECTION_COMPLETED | SHORTFALL |
+  /// RECOMMENDED | APPROVED | CERTIFICATE_ISSUED | REJECTED
+  status          String  @default("SUBMITTED")
+  /// The latest application on the file — the register shows only this one.
+  isCurrent       Boolean @default(true)
+  /// 1, then +1 each time a shortfall is answered and the building re-inspected.
+  round           Int     @default(1)
+
+  // The permission and the work it completes, frozen as they stood.
+  approvalOrderId    String
+  orderNumber        String
+  commencementNumber String    @default("")
+  commencementDate   DateTime?
+  ownerName          String    @default("")
+  ltpUserId          String
+  ltpName            String    @default("")
+  ltpLicenceNo       String    @default("")
+  /// The sanctioned figures (from the BPO snapshot) the building is measured against.
+  approvedFigures    Json      @default(dbgenerated("'{}'"))
+
+  // ── Completion intimation ────────────────────────────────────────────
+  completionDate    DateTime
+  completionRemarks String   @default("")
+  /// [{ kind, fileObjectId|null, fileName, mimeType, sizeBytes, isDemo, addedAt, addedByName, round }]
+  documents         Json     @default(dbgenerated("'[]'"))
+  submittedById     String?
+  submittedByName   String   @default("")
+  submittedAt       DateTime @default(now())
+
+  // ── The reviewing desk: as-built review and recommendation ───────────
+  /// APPROVE | REJECT
+  recommendation      String    @default("")
+  recommendationNotes String    @default("")
+  reviewedById        String?
+  reviewedByName      String    @default("")
+  reviewedByRoleKey   String    @default("")
+  reviewedAt          DateTime?
+
+  // ── Shortfall (current round) ────────────────────────────────────────
+  shortfallItems        Json      @default(dbgenerated("'[]'"))
+  shortfallRemarks      String    @default("")
+  shortfallRaisedByName String    @default("")
+  shortfallRaisedAt     DateTime?
+  shortfallResponse     String    @default("")
+  shortfallRespondedAt  DateTime?
+
+  // ── Decision ─────────────────────────────────────────────────────────
+  /// APPROVED | REJECTED
+  decision         String    @default("")
+  decisionRemarks  String    @default("")
+  decidedById      String?
+  decidedByName    String    @default("")
+  decidedByRoleKey String    @default("")
+  decidedAt        DateTime?
+
+  // ── Certificate ──────────────────────────────────────────────────────
+  /// OC/2026/000001
+  certificateNumber       String?   @unique
+  certificateIssuedAt     DateTime?
+  certificateIssuedByName String    @default("")
+  approvedAreaSqm         Float?
+  completedAreaSqm        Float?
+  certificateConditions   Json      @default(dbgenerated("'[]'"))
+  /// Everything printed on the certificate. The PDF renders from this alone.
+  certificateSnapshot     Json      @default(dbgenerated("'{}'"))
+  outwardEntryId          String?
+  outwardNumber           String    @default("")
+
+  /// The role whose step is next. Empty once closed.
+  currentDeskRoleKey String @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  application Application           @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  inspections OccupancyInspection[]
+  events      OccupancyEvent[]
+
+  @@index([applicationId, isCurrent])
+  @@index([status])
+  @@map("occupancy_applications")
+}
+
+/// One final inspection — one per round.
+model OccupancyInspection {
+  id            String @id @default(uuid())
+  occupancyId   String
+  applicationId String
+  round         Int
+  /// SCHEDULED | COMPLETED
+  status        String @default("SCHEDULED")
+
+  scheduledFor    DateTime
+  inspectorId     String?
+  inspectorName   String   @default("")
+  scheduledByName String   @default("")
+  scheduledAt     DateTime @default(now())
+
+  inspectedAt          DateTime?
+  siteCondition        String    @default("")
+  actualConstruction   String    @default("")
+  approvedConstruction String    @default("")
+  deviations           String    @default("")
+  remarks              String    @default("")
+  /// [{ view, fileObjectId|null, fileName, mimeType, isDemo, capturedAt }]
+  photos               Json      @default(dbgenerated("'[]'"))
+  /// RECOMMENDED | SHORTFALL | REJECT
+  recommendation       String    @default("")
+  /// The figures found on site. See AS_BUILT_PARAMETERS.
+  asBuiltFigures       Json      @default(dbgenerated("'{}'"))
+  /// MEASURED | DEMO — demo figures are generated, never measured.
+  asBuiltSource        String    @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  occupancy OccupancyApplication @relation(fields: [occupancyId], references: [id], onDelete: Cascade)
+
+  @@unique([occupancyId, round])
+  @@map("occupancy_inspections")
+}
+
+/// Append-only by convention; the audit chain carries the same facts.
+model OccupancyEvent {
+  id           String   @id @default(uuid())
+  occupancyId  String
+  action       String
+  fromStatus   String   @default("")
+  toStatus     String
+  actorId      String?
+  actorName    String   @default("")
+  actorRoleKey String   @default("")
+  remarks      String   @default("")
+  occurredAt   DateTime @default(now())
+
+  occupancy OccupancyApplication @relation(fields: [occupancyId], references: [id], onDelete: Cascade)
+
+  @@index([occupancyId, occurredAt])
+  @@map("occupancy_events")
 }

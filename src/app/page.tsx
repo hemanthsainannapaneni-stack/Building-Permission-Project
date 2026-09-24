@@ -10,5 +10,5 @@ export const dynamic = 'force-dynamic';
  */
 export default async function Home() {
   const user = await getAuthUser();
-  redirect(user ? '/dashboard' : '/login');
+  redirect(user ? '/dashboard' : '/login?session=ended');
 }

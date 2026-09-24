@@ -21,12 +21,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { EmptyState } from '@/components/common/empty-state';
+import Link from 'next/link';
 
 export type LogItem = {
   id: string;
   channel: string;
   eventCode: string;
   recipient: string;
+  recipientName: string;
   subject: string;
   body: string;
   status: string;
@@ -35,6 +37,13 @@ export type LogItem = {
   errorMessage: string;
   sentAt: string | null;
   createdAt: string;
+  applicationId: string | null;
+  applicationNumber: string;
+  templateId: string | null;
+  templateName: string;
+  /** Null on a channel that cannot report a read receipt — email and SMS. */
+  isRead: boolean | null;
+  readAt: string | null;
 };
 
 export function NotificationLogsTable({
@@ -213,18 +222,19 @@ export function NotificationLogsTable({
                 <TableHead className="w-16">Channel</TableHead>
                 <TableHead>Recipient</TableHead>
                 <TableHead>Event</TableHead>
-                <TableHead>Message Preview</TableHead>
-                <TableHead>Provider</TableHead>
-                <TableHead>Time</TableHead>
+                <TableHead>Application</TableHead>
+                <TableHead>Template</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead>Sent</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Failure Reason</TableHead>
+                <TableHead>Read</TableHead>
                 <TableHead className="w-10 text-right">View</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {initialLogs.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="h-40 text-center">
+                  <TableCell colSpan={10} className="h-40 text-center">
                     <EmptyState
                       icon={MessageSquare}
                       title="No logs found"
@@ -241,31 +251,70 @@ export function NotificationLogsTable({
                         <span className="text-caption font-semibold">{log.channel}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="font-mono text-small font-medium text-text">
-                      {log.recipient}
+                    <TableCell className="text-small text-text">
+                      <span className="block max-w-[12rem] truncate font-medium">
+                        {log.recipientName || '—'}
+                      </span>
+                      <span
+                        className="block max-w-[12rem] truncate font-mono text-caption text-text-muted"
+                        title={log.recipient}
+                      >
+                        {log.recipient}
+                      </span>
                     </TableCell>
                     <TableCell>
                       <Badge tone="outline" className="font-mono text-caption">
                         {log.eventCode}
                       </Badge>
                     </TableCell>
-                    <TableCell className="max-w-xs truncate text-small text-text-muted" title={log.body}>
-                      {log.body}
+                    <TableCell className="text-small">
+                      {log.applicationId ? (
+                        <Link
+                          href={`/applications/${log.applicationId}`}
+                          className="whitespace-nowrap text-primary hover:underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {log.applicationNumber || 'Open'}
+                        </Link>
+                      ) : (
+                        <span className="text-text-subtle">—</span>
+                      )}
                     </TableCell>
-                    <TableCell className="text-caption font-mono text-text-muted">
-                      {log.provider || 'system'}
+                    <TableCell
+                      className="max-w-[10rem] truncate text-caption text-text-muted"
+                      title={log.templateName}
+                    >
+                      {log.templateName}
                     </TableCell>
-                    <TableCell className="text-caption text-text-muted whitespace-nowrap">
-                      {new Date(log.createdAt).toLocaleString('en-IN', {
-                        day: '2-digit',
-                        month: 'short',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                    <TableCell className="whitespace-nowrap text-caption text-text-muted">
+                      {stamp(log.createdAt)}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-caption text-text-muted">
+                      {log.sentAt ? (
+                        <span className="flex flex-col">
+                          <span>{stamp(log.sentAt)}</span>
+                          {/* A mock provider did not send anything to anybody.
+                              Saying "Sent" without saying so would be the one
+                              claim a delivery register must never make. */}
+                          {/mock|console/i.test(log.provider) && (
+                            <span className="text-warning">simulated</span>
+                          )}
+                        </span>
+                      ) : (
+                        '—'
+                      )}
                     </TableCell>
                     <TableCell>{getStatusBadge(log.status)}</TableCell>
-                    <TableCell className="max-w-xs truncate text-caption text-danger" title={log.errorMessage}>
-                      {log.errorMessage || '—'}
+                    <TableCell className="whitespace-nowrap text-caption">
+                      {log.isRead === null ? (
+                        <span className="text-text-subtle" title="This channel has no read receipt">
+                          n/a
+                        </span>
+                      ) : log.isRead ? (
+                        <span className="text-success">{log.readAt ? stamp(log.readAt) : 'Read'}</span>
+                      ) : (
+                        <span className="text-text-muted">Unread</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
@@ -398,3 +447,12 @@ export function NotificationLogsTable({
     </div>
   );
 }
+
+/** One timestamp format across the register, so columns compare by eye. */
+const stamp = (value: string): string =>
+  new Date(value).toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });

@@ -42,6 +42,33 @@ const TEMPLATES: TemplateSeed[] = [
     variables: [A],
   },
   {
+    eventCode: 'APPLICATION_SUBMITTED',
+    channel: 'IN_APP',
+    subject: 'Application {{applicationNumber}} filed',
+    body:
+      'Your application has been filed and is with the department. ' +
+      'You will be told when it is reviewed or if anything further is required.',
+    variables: [A],
+  },
+  {
+    eventCode: 'APPLICATION_SUBMITTED',
+    channel: 'EMAIL',
+    subject: 'Application {{applicationNumber}} has been filed',
+    body:
+      'Dear {{recipientName}},\n\n' +
+      'Application {{applicationNumber}} has been filed and is now with the department.\n\n' +
+      'You can follow its progress here: {{link}}\n\n' +
+      '{{orgName}}',
+    variables: [A, 'recipientName', 'link', 'orgName'],
+  },
+  {
+    eventCode: 'APPLICATION_SUBMITTED',
+    channel: 'SMS',
+    subject: '',
+    body: 'Application {{applicationNumber}} has been filed and is with the department. - {{orgShortName}}',
+    variables: [A, 'orgShortName'],
+  },
+  {
     eventCode: 'DRAWING_UPLOADED',
     channel: 'IN_APP',
     subject: 'Drawing uploaded',
@@ -467,6 +494,213 @@ const TEMPLATES: TemplateSeed[] = [
       'This is a reporting notice. It does not change what may be done with the application.\n\n' +
       '{{orgName}}',
     variables: [A, 'stageName', 'overdueDays', 'recipientName', 'link', 'orgName'],
+  },
+
+  // ── Gaps found by the template-coverage check ─────────────────────────
+  //
+  // These three had neither a template row nor a built-in fallback, so the
+  // dispatcher rendered nothing and the message was silently dropped. Two of
+  // them are marked MANDATORY in the recipient rules — an account created
+  // today received no welcome at all, and a password reset produced no email,
+  // which is the difference between a working reset flow and a broken one.
+  {
+    eventCode: 'DOCUMENTS_PENDING',
+    channel: 'IN_APP',
+    subject: 'Documents outstanding on {{applicationNumber}}',
+    body: 'Some required documents have not been uploaded yet. The fee cannot be raised until they are in.',
+    variables: [A],
+  },
+  {
+    eventCode: 'DOCUMENTS_PENDING',
+    channel: 'EMAIL',
+    subject: 'Documents outstanding — {{applicationNumber}}',
+    body:
+      'Dear {{recipientName}},\n\n' +
+      'Some of the documents required for application {{applicationNumber}} have not been uploaded yet.\n\n' +
+      'Upload them here: {{link}}\n\n' +
+      '{{orgName}}',
+    variables: [A, 'recipientName', 'link', 'orgName'],
+  },
+  {
+    eventCode: 'USER_CREATED',
+    channel: 'EMAIL',
+    subject: 'Your {{orgName}} account has been created',
+    body:
+      'Dear {{recipientName}},\n\n' +
+      'An account has been created for you on {{orgName}} with the email address {{email}}.\n\n' +
+      'Set your password using the link you have been sent separately, then sign in here: {{link}}\n\n' +
+      'If you were not expecting this, tell your administrator.\n\n' +
+      '{{orgName}}',
+    // No password, and no link that sets one. A credential in an email body is
+    // a credential in a mailbox, a backup and a log, for ever.
+    variables: ['recipientName', 'email', 'link', 'orgName'],
+  },
+  {
+    eventCode: 'USER_CREATED',
+    channel: 'IN_APP',
+    subject: 'Welcome to {{orgName}}',
+    body: 'Your account is active. Your role decides what you can see and do.',
+    variables: ['orgName'],
+  },
+  {
+    eventCode: 'PASSWORD_RESET',
+    channel: 'EMAIL',
+    subject: 'Reset your {{orgName}} password',
+    body:
+      'Dear {{recipientName}},\n\n' +
+      'A password reset was requested for your account.\n\n' +
+      'Use this link to set a new password: {{link}}\n\n' +
+      'The link expires shortly. If you did not ask for this, ignore this message — ' +
+      'your password has not been changed.\n\n' +
+      '{{orgName}}',
+    variables: ['recipientName', 'link', 'orgName'],
+  },
+  {
+    eventCode: 'PASSWORD_RESET',
+    channel: 'SMS',
+    subject: '',
+    body: 'A password reset was requested for your {{orgShortName}} account. If this was not you, ignore this message.',
+    variables: ['orgShortName'],
+  },
+
+  // ── Phase 3: the desk-facing events ───────────────────────────────────
+  //
+  // These tell an OFFICER that work has arrived, so they are in-app and email
+  // only. An SMS to a departmental account at 2am about a file that will still
+  // be there in the morning is the message that teaches people to mute the
+  // channel the shortfall notices also arrive on.
+  {
+    eventCode: 'APPLICATION_ASSIGNED',
+    channel: 'IN_APP',
+    subject: 'Application {{applicationNumber}} assigned to you',
+    body: '{{applicationNumber}} is now with you at {{stageName}}. {{dueLine}}',
+    variables: [A, 'stageName', 'dueLine'],
+  },
+  {
+    eventCode: 'APPLICATION_ASSIGNED',
+    channel: 'EMAIL',
+    subject: 'Assigned to you: {{applicationNumber}}',
+    body:
+      'Dear {{recipientName}},\n\n' +
+      'Application {{applicationNumber}} has been assigned to you at {{stageName}}.\n\n' +
+      '{{dueLine}}\n\n' +
+      'Open it here: {{link}}\n\n' +
+      '{{orgName}}',
+    variables: [A, 'stageName', 'dueLine', 'recipientName', 'link', 'orgName'],
+  },
+  {
+    eventCode: 'REVIEW_REQUIRED',
+    channel: 'IN_APP',
+    subject: 'Review required — {{applicationNumber}}',
+    body: '{{applicationNumber}} has arrived at {{stageName}} and is waiting to be reviewed. {{dueLine}}',
+    variables: [A, 'stageName', 'dueLine'],
+  },
+  {
+    eventCode: 'REVIEW_REQUIRED',
+    channel: 'EMAIL',
+    subject: 'Review required: {{applicationNumber}} at {{stageName}}',
+    body:
+      'Dear {{recipientName}},\n\n' +
+      'Application {{applicationNumber}} is waiting for review at {{stageName}}.\n\n' +
+      '{{dueLine}}\n\n' +
+      'Open it here: {{link}}\n\n' +
+      '{{orgName}}',
+    variables: [A, 'stageName', 'dueLine', 'recipientName', 'link', 'orgName'],
+  },
+  {
+    eventCode: 'APPROVAL_REQUIRED',
+    channel: 'IN_APP',
+    subject: 'Approval required — {{applicationNumber}}',
+    body:
+      '{{applicationNumber}} has reached {{stageName}} and is ready for a decision. ' +
+      'Every shortfall on it must be settled before it can be approved. {{dueLine}}',
+    variables: [A, 'stageName', 'dueLine'],
+  },
+  {
+    eventCode: 'APPROVAL_REQUIRED',
+    channel: 'EMAIL',
+    subject: 'Approval required: {{applicationNumber}}',
+    body:
+      'Dear {{recipientName}},\n\n' +
+      'Application {{applicationNumber}} has reached {{stageName}} and is ready for a decision.\n\n' +
+      '{{dueLine}}\n\n' +
+      'Open it here: {{link}}\n\n' +
+      '{{orgName}}',
+    variables: [A, 'stageName', 'dueLine', 'recipientName', 'link', 'orgName'],
+  },
+
+  // ── Declared for later phases ─────────────────────────────────────────
+  //
+  // Nothing emits these yet. They are seeded so that Site Inspection,
+  // Commencement and Occupancy each find a template waiting rather than
+  // writing a fourth variation of the same sentence — and so an administrator
+  // can read today what those modules will eventually say.
+  {
+    eventCode: 'INSPECTION_DUE',
+    channel: 'IN_APP',
+    subject: 'Site inspection due — {{applicationNumber}}',
+    body: 'The site inspection for {{applicationNumber}} is due on {{dueDate}}.',
+    variables: [A, 'dueDate'],
+  },
+  {
+    eventCode: 'INSPECTION_DUE',
+    channel: 'EMAIL',
+    subject: 'Site inspection due on {{dueDate}} — {{applicationNumber}}',
+    body:
+      'Dear {{recipientName}},\n\n' +
+      'The site inspection for application {{applicationNumber}} is due on {{dueDate}}.\n\n' +
+      'Details: {{link}}\n\n' +
+      '{{orgName}}',
+    variables: [A, 'dueDate', 'recipientName', 'link', 'orgName'],
+  },
+  {
+    eventCode: 'INSPECTION_DUE',
+    channel: 'SMS',
+    subject: '',
+    body: 'Site inspection for application {{applicationNumber}} is due on {{dueDate}}. - {{orgShortName}}',
+    variables: [A, 'dueDate', 'orgShortName'],
+  },
+  {
+    eventCode: 'WORK_INITIATED',
+    channel: 'IN_APP',
+    subject: 'Work initiated — {{applicationNumber}}',
+    body: 'Commencement of work has been recorded against {{applicationNumber}}.',
+    variables: [A],
+  },
+  {
+    eventCode: 'WORK_INITIATED',
+    channel: 'EMAIL',
+    subject: 'Commencement recorded — {{applicationNumber}}',
+    body:
+      'Dear {{recipientName}},\n\n' +
+      'Commencement of work has been recorded against application {{applicationNumber}}.\n\n' +
+      '{{orgName}}',
+    variables: [A, 'recipientName', 'orgName'],
+  },
+  {
+    eventCode: 'OCCUPANCY_SUBMITTED',
+    channel: 'IN_APP',
+    subject: 'Occupancy application filed — {{applicationNumber}}',
+    body: 'An occupancy certificate application has been filed against {{applicationNumber}}.',
+    variables: [A],
+  },
+  {
+    eventCode: 'OCCUPANCY_SUBMITTED',
+    channel: 'EMAIL',
+    subject: 'Occupancy application filed — {{applicationNumber}}',
+    body:
+      'Dear {{recipientName}},\n\n' +
+      'An occupancy certificate application has been filed against {{applicationNumber}}.\n\n' +
+      'Open it here: {{link}}\n\n' +
+      '{{orgName}}',
+    variables: [A, 'recipientName', 'link', 'orgName'],
+  },
+  {
+    eventCode: 'OCCUPANCY_SUBMITTED',
+    channel: 'SMS',
+    subject: '',
+    body: 'Occupancy application filed against {{applicationNumber}}. - {{orgShortName}}',
+    variables: [A, 'orgShortName'],
   },
 ];
 

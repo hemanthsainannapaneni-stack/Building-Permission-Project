@@ -9,7 +9,9 @@ import { runScrutiny, pollScrutiny, failScrutiny } from '@/server/services/scrut
 import { ensureReport } from '@/server/services/scrutiny-report';
 import { reconcilePayments } from '@/server/services/payments';
 import { ensureReceipt } from '@/server/services/receipts';
-import { ensureApprovalOrder } from '@/server/services/approval-orders';
+import { advanceOrder, ensureApprovalOrder } from '@/server/services/approval-orders';
+import { storeApprovalOrderPdf } from '@/server/services/approval-order-pdf';
+import { ORDER_STATUS } from '@/lib/approval-orders';
 import { sweepSla } from '@/server/workflow/sla';
 import { JOB_TYPES, type ClaimedJob } from './queue';
 
@@ -289,5 +291,19 @@ register(JOB_TYPES.RENDER_APPROVAL_ORDER, async (job) => {
   if (!applicationId) return;
 
   const issuedById = String(job.payload.issuedById ?? '');
-  await ensureApprovalOrder(applicationId, issuedById);
+  const order = await ensureApprovalOrder(applicationId, issuedById);
+
+  // Render the document and carry the draft to GENERATED. The job does these
+  // two and stops: APPROVED and ISSUED are acts of a person, and a background
+  // worker that issued permissions on its own would be a worker that grants
+  // them. The applicant hears nothing until somebody issues it.
+  if (order.status !== ORDER_STATUS.DRAFT) return;
+
+  await storeApprovalOrderPdf(order.id);
+  await advanceOrder({
+    orderId: order.id,
+    to: ORDER_STATUS.GENERATED,
+    actor: { id: issuedById, name: 'system', roleKeys: ['SYSTEM'] },
+    remarks: 'Rendered by the approval-order job.',
+  });
 });

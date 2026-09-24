@@ -59,6 +59,7 @@ export async function validateWorkflow(db: Db, workflowId: string): Promise<Vali
         fromStageId: true,
         toStageId: true,
         fromStatus: true,
+        toStatus: true,
         allowedRoleKeys: true,
         guards: true,
         effects: true,
@@ -245,6 +246,18 @@ export async function validateWorkflow(db: Db, workflowId: string): Promise<Vali
       error(
         'no-destination',
         `${t.action.code} out of ${byId.get(t.fromStageId)?.code} has no destination and no effect that chooses one.`
+      );
+    }
+  }
+
+  // ── 9a. An empty toStatus is only for a transition that keeps the status ──
+  for (const t of transitions) {
+    if (t.toStatus) continue;
+    const keeps = asArray<{ type?: string }>(t.effects).some((e) => e?.type === 'KEEP_STATUS');
+    if (!keeps) {
+      error(
+        'no-status',
+        `${t.action.code} out of ${byId.get(t.fromStageId)?.code} names no resulting status and does not keep the current one.`
       );
     }
   }

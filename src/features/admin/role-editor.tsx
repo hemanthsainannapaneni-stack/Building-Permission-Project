@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Pencil, Trash2, Shield } from 'lucide-react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,7 +34,14 @@ const roleSchema = z.object({
   permissionKeys: z.array(z.string()).default([]),
 });
 
-type RoleInput = z.infer<typeof roleSchema>;
+/**
+ * Two types, because `.default()` makes them genuinely different: the form
+ * holds what the user has typed (where `description` may still be absent), and
+ * the submit handler receives what the schema produced (where it never is).
+ * Collapsing them is what made `zodResolver` refuse to type-check here.
+ */
+type RoleFormValues = z.input<typeof roleSchema>;
+type RoleInput = z.output<typeof roleSchema>;
 
 // ── Utilities ─────────────────────────────────────────────────────────────
 
@@ -88,7 +95,7 @@ function PermissionMatrix({ permissions, selected, onChange }: {
                 id={`module-${module}`}
                 checked={allSelected}
                 data-indeterminate={someSelected && !allSelected ? true : undefined}
-                onCheckedChange={() => toggleModule(perms)}
+                onChange={() => toggleModule(perms)}
               />
               <label htmlFor={`module-${module}`} className="text-caption font-semibold uppercase tracking-wide text-text-subtle cursor-pointer">{module}</label>
             </div>
@@ -98,7 +105,7 @@ function PermissionMatrix({ permissions, selected, onChange }: {
                   <Checkbox
                     id={`perm-${p.key}`}
                     checked={selected.includes(p.key)}
-                    onCheckedChange={() => toggle(p.key)}
+                    onChange={() => toggle(p.key)}
                   />
                   <span className="text-sm font-mono text-text-subtle">{p.key}</span>
                 </label>
@@ -117,7 +124,7 @@ function RoleDialog({ open, onClose, onSaved, editing, permissions }: {
   open: boolean; onClose: () => void; onSaved: () => void;
   editing: RoleRow | null; permissions: PermissionRow[];
 }) {
-  const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting }, reset } = useForm<RoleInput>({
+  const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting }, reset } = useForm<RoleFormValues, unknown, RoleInput>({
     resolver: zodResolver(roleSchema),
   });
   const selectedPerms = watch('permissionKeys') ?? [];

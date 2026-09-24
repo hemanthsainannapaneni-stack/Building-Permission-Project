@@ -63,6 +63,15 @@ const RULES: Record<string, { rules: RecipientRule[]; mandatory?: boolean }> = {
   APPLICATION_FORWARDED: { rules: ['LTP'] },
   APPLICATION_RETURNED: { rules: ['LTP'], mandatory: true },
   TASK_ASSIGNED: { rules: ['ASSIGNED_OFFICER', 'STAGE_ROLE'] },
+  // The officer who now holds it, and nobody else. The applicant does not
+  // need to be told which clerk has their file, and telling them invites a
+  // telephone call to that clerk.
+  APPLICATION_ASSIGNED: { rules: ['ASSIGNED_OFFICER'] },
+  // Work waiting at a desk. Addressed to the desk rather than to a person,
+  // because an unclaimed file has no person yet — which is precisely the
+  // situation worth announcing.
+  REVIEW_REQUIRED: { rules: ['ASSIGNED_OFFICER', 'STAGE_ROLE'] },
+  APPROVAL_REQUIRED: { rules: ['ASSIGNED_OFFICER', 'STAGE_ROLE'] },
 
   // Shortfalls
   SHORTFALL_RAISED: { rules: ['LTP', 'APPLICANT'], mandatory: true },
@@ -79,6 +88,18 @@ const RULES: Record<string, { rules: RecipientRule[]; mandatory?: boolean }> = {
   SLA_DUE_SOON: { rules: ['ASSIGNED_OFFICER'] },
   SLA_OVERDUE: { rules: ['ASSIGNED_OFFICER', 'ESCALATION_ROLE'] },
   SLA_BREACHED: { rules: ['ASSIGNED_OFFICER', 'ESCALATION_ROLE'] },
+
+  // ── Declared for later phases ─────────────────────────────────────────
+  //
+  // Nothing emits these yet. The rules exist so that the module that
+  // eventually does emit them does not have to decide who hears about them,
+  // which is a policy question and not an implementation detail.
+  INSPECTION_DUE: { rules: ['ASSIGNED_OFFICER', 'LTP'], mandatory: true },
+  // Emitted since Phase 9 (NOTIFY_WORK_COMMENCEMENT). STAGE_ROLE resolves to
+  // nobody for it: an approved file sits at no desk, and the engine's payload
+  // names none. The department sees it on the Work Initiated register.
+  WORK_INITIATED: { rules: ['LTP', 'APPLICANT', 'STAGE_ROLE'] },
+  OCCUPANCY_SUBMITTED: { rules: ['LTP', 'APPLICANT', 'STAGE_ROLE'], mandatory: true },
 
   USER_CREATED: { rules: ['USER'], mandatory: true },
   PASSWORD_RESET: { rules: ['USER'], mandatory: true },

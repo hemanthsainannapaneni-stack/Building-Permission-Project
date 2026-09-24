@@ -7,34 +7,31 @@ import { ReportsErrorBoundary } from '@/features/reports/error-boundary';
 export const metadata: Metadata = { title: 'Reports & Analytics' };
 export const dynamic = 'force-dynamic';
 
+/**
+ * Reports is an internal screen like every other page in the portal.
+ *
+ * `requirePageUser()` sends an unauthenticated visitor to the sign-in page by
+ * THROWING Next's redirect signal. It must therefore not be wrapped in a
+ * try/catch here: catching it swallows the redirect and renders the error
+ * branch instead, which is how this page came to show a stack trace to anyone
+ * who opened it signed out. Render failures inside the dashboard are handled
+ * where they belong — in ReportsErrorBoundary, on the client.
+ */
 export default async function ReportsPage() {
-  try {
-    await requirePageUser();
-    const data = await fetchDashboardData();
-    
-    return (
-      <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
-        <div className="flex items-center justify-between space-y-2">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">Reports & Analytics</h1>
-            <p className="text-sm text-muted-foreground">Comprehensive executive metrics, trends, and officer workloads.</p>
-          </div>
+  await requirePageUser();
+  const data = await fetchDashboardData();
+
+  return (
+    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
+      <div className="flex items-center justify-between space-y-2">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">Reports &amp; Analytics</h1>
+          <p className="text-sm text-muted-foreground">Comprehensive executive metrics, trends, and officer workloads.</p>
         </div>
-        <ReportsErrorBoundary>
-          <ReportsDashboard initialData={data} />
-        </ReportsErrorBoundary>
       </div>
-    );
-  } catch (error: any) {
-    return (
-      <div className="p-8">
-        <h1 className="text-red-500 font-bold text-2xl mb-4">Server Error Debug</h1>
-        <pre className="bg-red-50 p-4 border border-red-200 rounded text-red-900 whitespace-pre-wrap">
-          {error?.message || String(error)}
-          {'\n\n'}
-          {error?.stack}
-        </pre>
-      </div>
-    );
-  }
+      <ReportsErrorBoundary>
+        <ReportsDashboard initialData={data} />
+      </ReportsErrorBoundary>
+    </div>
+  );
 }

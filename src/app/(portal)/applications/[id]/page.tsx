@@ -6,13 +6,23 @@ import { CAPABILITIES } from '@/lib/constants';
 import { can } from '@/server/auth/context';
 import { getApplication, getApplicationMeta, getTimeline } from '@/server/services/applications';
 import { listDrawings, drawingCategories } from '@/server/services/drawings';
+import { getBim } from '@/server/services/bim';
 import { getScrutiny } from '@/server/services/scrutiny';
 import { getDocuments, documentTypes } from '@/server/services/documents';
 import { getFees } from '@/server/services/fees';
 import { getPayments } from '@/server/services/payments';
+import { getApplicationChecklist } from '@/server/services/application-checklist';
+import { getApplicationOthers } from '@/server/services/application-others';
+import { getApplicationInspections } from '@/server/services/site-inspections';
+import { getApplicationNocs } from '@/server/services/nocs';
+import { getApplicationProceedings } from '@/server/services/show-cause';
+import { getApplicationProfessional } from '@/server/services/professional-changes';
+import { getApplicationCommencement } from '@/server/services/work-commencements';
+import { getApplicationOccupancy } from '@/server/services/occupancy';
 import { getWorkflowState, getHistory, getShortfalls } from '@/server/workflow/engine';
 import { applicationAudit } from '@/server/services/audit';
 import { openShortfallsFor } from '@/server/shortfalls/queries';
+import { getApprovalOrder } from '@/server/services/approval-orders';
 import { isLtp } from '@/server/auth/context';
 import { env } from '@/server/config/env';
 import { isApiError } from '@/server/http/errors';
@@ -23,10 +33,20 @@ import type {
   ApplicationMeta,
   TimelineEvent,
 } from '@/features/applications/types';
+import type { ChecklistPayload } from '@/features/checklist/types';
+import type { OthersPayload } from '@/features/others/types';
+import type { ApplicationInspectionsPayload } from '@/features/inspections/types';
+import type { ApplicationNocsPayload } from '@/features/nocs/types';
+import type { ApplicationProceedingsPayload } from '@/features/proceedings/types';
+import type { ApplicationProfessionalPayload } from '@/features/professional-change/types';
+import type { ApplicationCommencementPayload } from '@/features/commencement/types';
+import type { ApplicationOccupancyPayload } from '@/features/occupancy/types';
 import type { DrawingsPayload, ScrutinyPayload } from '@/features/drawings/types';
+import type { BimPayload } from '@/features/bim/types';
 import type { DocumentsPayload } from '@/features/documents/types';
 import type { FeesPayload } from '@/features/fees/types';
 import type { PaymentsPayload } from '@/features/payments/types';
+import type { OrderView } from '@/features/approvals/order-panel';
 import type { HistoryEntry, Shortfall, WorkflowState } from '@/features/workflow/types';
 import type { AuditRow } from '@/features/applications/audit-panel';
 import type { ShortfallRow } from '@/features/shortfalls/types';
@@ -120,8 +140,11 @@ export default async function ApplicationPage({ params }: { params: Promise<{ id
   const [
     timeline,
     meta,
+    checklist,
+    others,
     drawings,
     categories,
+    bim,
     scrutiny,
     documents,
     docTypes,
@@ -132,11 +155,27 @@ export default async function ApplicationPage({ params }: { params: Promise<{ id
     shortfalls,
     auditRows,
     openShortfalls,
+    order,
+    inspections,
+    nocs,
+    proceedings,
+    professional,
+    commencement,
+    occupancy,
   ] = await Promise.all([
     getTimeline(user, id),
     getApplicationMeta(),
+    // CHECKLIST_VIEW is a grant of its own, so the checklist is fetched only
+    // for a caller who may see it — not as an optimisation, but because
+    // loading nineteen answers for somebody whose role excludes them would put
+    // them into the page payload whether or not a tab ever rendered it.
+    can(user, CAPABILITIES.CHECKLIST_VIEW) ? getApplicationChecklist(user, id) : null,
+    // No capability of its own: the Others block is part of the application's
+    // own particulars, and everybody who may see the file may see them.
+    getApplicationOthers(user, id),
     listDrawings(user, id),
     drawingCategories(),
+    can(user, CAPABILITIES.DRAWING_VIEW) ? getBim(user, id) : null,
     getScrutiny(user, id),
     can(user, CAPABILITIES.DOCUMENT_VIEW) ? getDocuments(user, id) : null,
     can(user, CAPABILITIES.DOCUMENT_VIEW) ? documentTypes() : null,
@@ -152,6 +191,19 @@ export default async function ApplicationPage({ params }: { params: Promise<{ id
     // read by application id alone.
     can(user, CAPABILITIES.AUDIT_VIEW) ? applicationAudit(id) : null,
     can(user, CAPABILITIES.SHORTFALL_VIEW) ? openShortfallsFor(user, id) : [],
+    can(user, CAPABILITIES.ORDER_VIEW) ? getApprovalOrder(user, id) : null,
+    // SITE_INSPECTION_VIEW is its own grant: the applicant does not hold it.
+    can(user, CAPABILITIES.SITE_INSPECTION_VIEW) ? getApplicationInspections(user, id) : null,
+    can(user, CAPABILITIES.NOC_VIEW) ? getApplicationNocs(user, id) : null,
+    can(user, CAPABILITIES.SHOW_CAUSE_VIEW) ? getApplicationProceedings(user, id) : null,
+    can(user, CAPABILITIES.PROFESSIONAL_CHANGE_VIEW) ? getApplicationProfessional(user, id) : null,
+    // Post approval only: before approval the tab has nothing to show.
+    can(user, CAPABILITIES.COMMENCEMENT_VIEW) && ['APPROVED', 'PROCEEDING_REVOKED'].includes(application.status)
+      ? getApplicationCommencement(user, id)
+      : null,
+    can(user, CAPABILITIES.OCCUPANCY_VIEW) && ['APPROVED', 'PROCEEDING_REVOKED'].includes(application.status)
+      ? getApplicationOccupancy(user, id)
+      : null,
   ]);
 
   return (
@@ -162,6 +214,10 @@ export default async function ApplicationPage({ params }: { params: Promise<{ id
       capabilities={user.capabilities}
       canEdit={can(user, CAPABILITIES.APPLICATION_EDIT)}
       canDelete={can(user, CAPABILITIES.APPLICATION_DELETE)}
+      // Serialised rather than cast: both carry Date columns that the client
+      // types declare as ISO strings.
+      checklist={serialize(checklist) as ChecklistPayload | null}
+      others={serialize(others) as OthersPayload}
       drawings={
         {
           ...drawings,
@@ -169,6 +225,7 @@ export default async function ApplicationPage({ params }: { params: Promise<{ id
           maxUploadBytes: env.maxUploadBytes,
         } as unknown as DrawingsPayload
       }
+      bim={serialize(bim) as unknown as BimPayload | null}
       scrutiny={scrutiny as unknown as ScrutinyPayload}
       documents={
         documents
@@ -183,6 +240,7 @@ export default async function ApplicationPage({ params }: { params: Promise<{ id
       // as much as an API response is.
       payments={serialize(payments) as PaymentsPayload | null}
       canUploadDrawing={can(user, CAPABILITIES.DRAWING_UPLOAD)}
+      canReviewBim={can(user, CAPABILITIES.CHECKLIST_REVIEW)}
       canRequestScrutiny={can(user, CAPABILITIES.SCRUTINY_REQUEST)}
       canUploadDocument={can(user, CAPABILITIES.DOCUMENT_UPLOAD)}
       canVerifyDocument={can(user, CAPABILITIES.DOCUMENT_VERIFY)}
@@ -198,6 +256,14 @@ export default async function ApplicationPage({ params }: { params: Promise<{ id
       audit={serialize(auditRows) as AuditRow[] | null}
       openShortfalls={serialize(openShortfalls) as unknown as ShortfallRow[]}
       viewerIsApplicant={isLtp(user)}
+      order={serialize(order) as unknown as OrderView | null}
+      canAdvanceOrder={can(user, CAPABILITIES.APPLICATION_APPROVE)}
+      inspections={serialize(inspections) as unknown as ApplicationInspectionsPayload | null}
+      nocs={serialize(nocs) as unknown as ApplicationNocsPayload | null}
+      proceedings={serialize(proceedings) as unknown as ApplicationProceedingsPayload | null}
+      professional={serialize(professional) as unknown as ApplicationProfessionalPayload | null}
+      commencement={serialize(commencement) as unknown as ApplicationCommencementPayload | null}
+      occupancy={serialize(occupancy) as unknown as ApplicationOccupancyPayload | null}
     />
   );
 }

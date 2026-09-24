@@ -1,0 +1,42 @@
+# A throwaway Postgres for running the test suite.
+#
+# Restored from c70cf3e^ and trimmed to the database service alone. The `app`
+# and `worker` images that used to live here built from Dockerfile and
+# Dockerfile.worker, which are deliberately NOT restored: containerised
+# deployment is a production concern and this demo phase does not need it.
+# What the repository does need is somewhere safe to run the integration
+# suite, because DATABASE_URL points at the hosted demonstration database and
+# those tests delete rows.
+#
+#   docker compose up -d db
+#   createdb -h localhost -p 5433 -U lams lams_test     # once
+#   DATABASE_URL=postgresql://lams:lams@localhost:5433/lams_test \
+#   DIRECT_URL=postgresql://lams:lams@localhost:5433/lams_test \
+#     npx prisma db push && npm run db:seed && npm test
+#
+# tests/integration/setup.ts refuses to run against anything that is not a
+# local host or a *_test database, so pointing this at the demo by accident
+# skips the suite rather than destroying it.
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: lams-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: lams
+      POSTGRES_PASSWORD: lams
+      POSTGRES_DB: lams
+    ports:
+      # 5433 on the host: 5432 is taken by the adjacent land allotment
+      # project's Postgres. Inside the compose network the port is still 5432.
+      - '5433:5432'
+    volumes:
+      - lams-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U lams -d lams']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  lams-db-data:

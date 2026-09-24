@@ -3,7 +3,6 @@ import Link from 'next/link';
 import { FilePlus2, ListChecks } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { requirePageUser } from '@/server/auth/page-guard';
-import { prisma } from '@/server/db/prisma';
 import { dashboardFor } from '@/lib/rbac-matrix';
 import { ROLES, type RoleKey } from '@/lib/constants';
 import { PageHeader } from '@/components/common/page-header';

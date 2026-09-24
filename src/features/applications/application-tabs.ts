@@ -4,7 +4,7 @@ import { CAPABILITIES as C } from '@/lib/constants';
 /**
  * The application detail page's tabs, as data.
  *
- * All eleven are declared from the start and each is enabled by the phase that
+ * All thirteen are declared from the start and each is enabled by the phase that
  * builds it — Overview and Details in Phase 2, Drawings and Scrutiny in
  * Phase 3. That is a deliberate choice over adding tabs phase by phase:
  *
@@ -24,13 +24,22 @@ import { CAPABILITIES as C } from '@/lib/constants';
 export type TabKey =
   | 'overview'
   | 'details'
+  | 'checklist'
+  | 'others'
   | 'drawings'
+  | 'bim'
   | 'scrutiny'
+  | 'inspection'
+  | 'nocs'
   | 'documents'
   | 'fees'
   | 'payments'
   | 'workflow'
   | 'shortfalls'
+  | 'proceedings'
+  | 'professional'
+  | 'commencement'
+  | 'occupancy'
   | 'communications'
   | 'audit';
 
@@ -63,12 +72,38 @@ export const APPLICATION_TABS: readonly TabDef[] = [
     description: 'Every particular entered on the application.',
   },
   {
+    key: 'checklist',
+    label: 'Checklist',
+    available: true,
+    phase: '',
+    description:
+      'The 19-point application checklist — the applicant’s answers, each desk’s verification, and the full history of both.',
+    capabilities: [C.CHECKLIST_VIEW],
+  },
+  {
+    key: 'others',
+    label: 'Others',
+    available: true,
+    phase: '',
+    description:
+      'Mortgage, car insurance, solar, rainwater harvesting, greening and the special remarks — the undertakings that travel with the permission.',
+  },
+  {
     key: 'drawings',
     label: 'Drawings',
     available: true,
     phase: '',
     description:
       'Upload the building drawing and see every version. A correction is always a new version — nothing is overwritten.',
+    capabilities: [C.DRAWING_VIEW],
+  },
+  {
+    key: 'bim',
+    label: 'BIM',
+    available: true,
+    phase: '',
+    description:
+      'The building information model submitted with the drawings — the IFC files, what the model itself says, how it agrees with the application, and the department’s review.',
     capabilities: [C.DRAWING_VIEW],
   },
   {
@@ -79,6 +114,24 @@ export const APPLICATION_TABS: readonly TabDef[] = [
     description:
       'The automated check of the drawing against the building rules, and the issues it reports.',
     capabilities: [C.SCRUTINY_VIEW],
+  },
+  {
+    key: 'inspection',
+    label: 'Site Inspection',
+    available: true,
+    phase: '',
+    description:
+      'The TPA’s site visit — the 27 questions (provisional demo wording), geo-tagged photographs, the recommendation and the demo signature.',
+    capabilities: [C.SITE_INSPECTION_VIEW],
+  },
+  {
+    key: 'nocs',
+    label: 'NOCs',
+    available: true,
+    phase: '',
+    description:
+      'No-objection certificates from external authorities — Fire today — with what is required, received, verified and still pending.',
+    capabilities: [C.NOC_VIEW],
   },
   {
     key: 'documents',
@@ -123,6 +176,42 @@ export const APPLICATION_TABS: readonly TabDef[] = [
     description:
       'Anything the department has asked for, your response, and whether it was accepted.',
     capabilities: [C.SHORTFALL_VIEW],
+  },
+  {
+    key: 'proceedings',
+    label: 'Proceedings',
+    available: true,
+    phase: '',
+    description:
+      'Show cause notices, revocation proceedings and the documents this file has sent through Outward. Separate from shortfalls.',
+    capabilities: [C.SHOW_CAUSE_VIEW],
+  },
+  {
+    key: 'professional',
+    label: 'Technical Professional',
+    available: true,
+    phase: '',
+    description:
+      'Who holds this file and may submit drawings, everyone who has held it, and any request to change the professional.',
+    capabilities: [C.PROFESSIONAL_CHANGE_VIEW],
+  },
+  {
+    key: 'commencement',
+    label: 'Work Initiated',
+    available: true,
+    phase: '',
+    description:
+      'After approval: the building permission order, the approved plan and scrutiny report, and the notice that work has commenced on site.',
+    capabilities: [C.COMMENCEMENT_VIEW],
+  },
+  {
+    key: 'occupancy',
+    label: 'Occupancy',
+    available: true,
+    phase: '',
+    description:
+      'Completion intimation, the final inspection, the as-built review against the approved plan, the recommendation and decision, and the occupancy certificate.',
+    capabilities: [C.OCCUPANCY_VIEW],
   },
   {
     key: 'communications',
