@@ -16,7 +16,7 @@ import { getPublicDeveloperStatus, getPublicLtp } from './registers';
  *
  * ── What is recorded: nothing ───────────────────────────────────────────
  *
- * Nirman has no model for "consent to an application" — the only consent in
+ * BBAS has no model for "consent to an application" — the only consent in
  * the system is the one an LTP or developer gives when they are registered,
  * and it belongs to that registration. So the answer given here is NOT
  * stored: no consent row, no audit row, no message sent. The acknowledgement

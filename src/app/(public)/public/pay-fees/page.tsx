@@ -47,7 +47,7 @@ export default async function PayFeesPage({ searchParams }: { searchParams: Prom
       intro="Look up the fee demand and payment record for an application, and make a demonstration payment."
       crumbs={[{ label: 'Citizen Service' }]}
     >
-      <DemoBanner>Demo payment only — no real transaction will be processed. Nirman uses a demonstration payment gateway; nothing here is connected to a bank, CFMS or a real payment service.</DemoBanner>
+      <DemoBanner>Demo payment only — no real transaction will be processed. BBAS uses a demonstration payment gateway; nothing here is connected to a bank, CFMS or a real payment service.</DemoBanner>
 
       <Panel title="Find the fee record">
         <LookupForm

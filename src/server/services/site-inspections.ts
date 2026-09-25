@@ -1275,8 +1275,8 @@ function demoSignature(method: SignatureMethod, user: AuthUser, input: SubmitIns
   const common = {
     provider: 'DEMO',
     methodLabel: SIGNATURE_METHOD_LABEL[method],
-    certificateSubject: `CN=${user.name}, OU=Town Planning, O=Nirman Demo`,
-    certificateIssuer: 'CN=Nirman Demo CA (not a licensed CA)',
+    certificateSubject: `CN=${user.name}, OU=Town Planning, O=BBAS Demo`,
+    certificateIssuer: 'CN=BBAS Demo CA (not a licensed CA)',
     hashAlgorithm: 'SHA-256',
     signedDigest: hash,
     disclaimer: DEMO_SIGNATURE_DISCLAIMER,

@@ -37,12 +37,16 @@ export function PublicNav({ items }: { items: NavItem[] }) {
   const isCurrent = (href: string) => (href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`));
 
   return (
-    <nav aria-label="Primary" className="bg-primary text-primary-text">
+    <nav aria-label="Primary" className="bg-[#fafafa] text-text border-y border-border">
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="flex-1 py-3">
+          <span className="font-semibold text-text text-sm tracking-wide">BIM Based Building Permit System</span>
+        </div>
+        
         <button
           ref={button}
           type="button"
-          className="my-1.5 inline-flex h-10 items-center gap-2 rounded-md px-3 text-body font-semibold hover:bg-white/10 md:hidden"
+          className="my-1.5 inline-flex h-10 items-center gap-2 rounded-md px-3 text-body font-semibold hover:bg-slate-100 md:hidden"
           aria-expanded={open}
           aria-controls="public-nav-list"
           onClick={() => setOpen((o) => !o)}
@@ -53,8 +57,8 @@ export function PublicNav({ items }: { items: NavItem[] }) {
         <ul
           id="public-nav-list"
           className={cn(
-            'w-full flex-col gap-0.5 pb-2 md:flex md:w-auto md:flex-row md:gap-1 md:pb-0',
-            open ? 'absolute inset-x-0 top-full z-30 flex bg-primary px-4 shadow-elevated md:static md:bg-transparent md:px-0 md:shadow-none' : 'hidden md:flex'
+            'w-full flex-col gap-2 pb-2 md:flex md:w-auto md:flex-row md:items-center md:gap-4 md:pb-0',
+            open ? 'absolute inset-x-0 top-full z-30 flex bg-[#fafafa] px-4 shadow-elevated md:static md:bg-transparent md:px-0 md:shadow-none border-b border-border md:border-none' : 'hidden md:flex'
           )}
         >
           {items.map((item) => (
@@ -63,8 +67,9 @@ export function PublicNav({ items }: { items: NavItem[] }) {
                 href={item.href}
                 aria-current={isCurrent(item.href) ? 'page' : undefined}
                 className={cn(
-                  'block rounded-md px-4 py-3 text-body font-semibold transition-colors hover:bg-white/15 focus-visible:outline-2 focus-visible:outline-white md:py-3.5',
-                  isCurrent(item.href) && 'bg-white/20 md:border-b-2 md:border-white md:bg-transparent md:rounded-none'
+                  'block rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-primary',
+                  isCurrent(item.href) && 'bg-slate-100',
+                  item.label === 'Login' || item.label === 'My workspace' ? 'border border-border bg-white shadow-sm hover:bg-slate-50' : ''
                 )}
               >
                 {item.label}

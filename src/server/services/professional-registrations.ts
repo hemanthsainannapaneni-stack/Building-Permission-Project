@@ -11,6 +11,7 @@ import { CAPABILITIES, ROLES } from '@/lib/constants';
 import {
   CLOSED_PROFESSIONAL_STATUSES,
   CONSENT_TEXT,
+  DEFAULT_PROFESSIONAL_TYPES,
   DEFAULT_PROFESSIONAL_RENEWAL_WINDOW_DAYS,
   DEFAULT_PROFESSIONAL_VALIDITY_YEARS,
   PROFESSIONAL_APPLICATION_PREFIX,
@@ -131,7 +132,10 @@ export async function professionalTypes(opts: { activeOnly?: boolean } = {}): Pr
     where: { category: PROFESSIONAL_TYPE_CATEGORY, ...(opts.activeOnly ? { isActive: true } : {}) },
     orderBy: [{ displayOrder: 'asc' }, { label: 'asc' }],
   });
-  return rows.map(typeOption);
+  if (rows.length === 0) {
+    return DEFAULT_PROFESSIONAL_TYPES.map(t => typeOption({ code: t.code, label: t.label, isActive: true, metadata: t.metadata }));
+  }
+  return rows.map(r => typeOption(r as any));
 }
 
 const typeCodes = async (pred: (t: ProfessionalTypeOption) => boolean) => (await professionalTypes()).filter(pred).map((t) => t.code);

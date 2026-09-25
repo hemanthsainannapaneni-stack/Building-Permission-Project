@@ -36,12 +36,12 @@ export function Sidebar({
     >
       <div className={cn('flex h-16 items-center gap-3 border-b border-white/20 px-4', collapsed && 'justify-center px-0')}>
         <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-white text-[#0f172a] shadow-sm overflow-hidden">
-          <img src="/logo.jpg" alt="Nirman Logo" className="size-full object-cover" />
+          <img src="/logo.jpg" alt="BBAS Logo" className="size-full object-cover" />
         </div>
         {!collapsed && (
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="truncate text-h2 font-bold tracking-tight text-white">Nirman</span>
+              <span className="truncate text-h2 font-bold tracking-tight text-white">BBAS</span>
               <span className="rounded-md bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-white">
                 AP
               </span>

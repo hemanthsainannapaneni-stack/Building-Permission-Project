@@ -24,8 +24,8 @@ const interFont = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Nirman',
-    template: '%s · Nirman',
+    default: 'BBAS',
+    template: '%s · BBAS',
   },
   description: 'Building permission application, scrutiny and approval platform.',
   robots: { index: false, follow: false },

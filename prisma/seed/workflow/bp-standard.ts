@@ -1,7 +1,7 @@
 import type { WorkflowDefinition } from './builder';
 
 /**
- * BP_STANDARD — the six-desk hierarchy Nirman shipped with.
+ * BP_STANDARD — the six-desk hierarchy BBAS shipped with.
  *
  * TPA → ZAD/ZDD → ZJD → Director (DP) → Additional Commissioner → Commissioner.
  *

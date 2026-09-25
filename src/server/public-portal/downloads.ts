@@ -19,7 +19,7 @@ import { listPublicDevelopers, listPublicLtps, type Paged } from './registers';
  *
  *   LIVE         a CSV built at request time from the database — the document
  *                checklist, the developer register, the LTP register. These
- *                are Nirman's own data, not an imitation of anything.
+ *                are BBAS's own data, not an imitation of anything.
  *   DEMO_GUIDE   a short PDF written for this demonstration from the content
  *                in `public-content.ts`.
  *   PLACEHOLDER  a one-page PDF that stands where an official document would
@@ -178,9 +178,9 @@ export async function buildDownload(slug: string): Promise<BuiltDownload | null>
 
   if (item.kind === 'LIVE') {
     const body = item.slug === 'document-checklist' ? await documentChecklist() : item.slug === 'registered-developers' ? await developerRegister() : await ltpRegister();
-    return { filename: `nirman-${slugFile(item.slug)}.csv`, contentType: 'text/csv; charset=utf-8', body };
+    return { filename: `bbas-${slugFile(item.slug)}.csv`, contentType: 'text/csv; charset=utf-8', body };
   }
-  return { filename: `nirman-${slugFile(item.slug)}-DEMO.pdf`, contentType: 'application/pdf', body: pdfFor(item) };
+  return { filename: `bbas-${slugFile(item.slug)}-DEMO.pdf`, contentType: 'application/pdf', body: pdfFor(item) };
 }
 
 export { DOWNLOAD_CATEGORIES };

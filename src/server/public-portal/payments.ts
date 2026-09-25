@@ -33,7 +33,7 @@ import { publicRegistrationStatus } from '@/lib/public-portal';
  *
  * ── 2. A registration RENEWAL fee — a demonstration state, nothing more ──
  *
- * Nirman has a fee engine and payment ledger for building-permission
+ * BBAS has a fee engine and payment ledger for building-permission
  * applications. It has none for registrations, and this phase does not build
  * one. A renewal's "payment" is therefore a labelled demonstration record: an
  * event on the renewal and a hash-chained audit row carrying the receipt

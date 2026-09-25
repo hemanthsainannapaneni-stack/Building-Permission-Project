@@ -35,8 +35,8 @@ const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 
   APP_URL: z.string().default('http://localhost:3000'),
-  APP_NAME: z.string().default('Nirman'),
-  ORG_SHORT_NAME: z.string().default('Nirman'),
+  APP_NAME: z.string().default('BBAS'),
+  ORG_SHORT_NAME: z.string().default('BBAS'),
 
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required').default('postgresql://postgres.bunfbgaxbueririehybw:Digitaltwin%405678@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=20&pool_timeout=30'),
   DIRECT_URL: optional,

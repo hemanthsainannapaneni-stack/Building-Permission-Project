@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { Explore, Highlights, ServiceCards, WhatIsBbas, WhatIsBim } from '@/features/public-portal/home';
 import { DemoBanner, Container } from '@/features/public-portal/primitives';
 
-export const metadata: Metadata = { title: { absolute: 'Nirman | Building Permission Portal' } };
+export const metadata: Metadata = { title: { absolute: 'BBAS | Building Permission Portal' } };
 
 /**
  * The public home page — `/`.

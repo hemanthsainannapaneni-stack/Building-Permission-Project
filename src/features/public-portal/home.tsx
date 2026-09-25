@@ -141,7 +141,7 @@ export function WhatIsBbas() {
         </ol>
         <p className="mt-6">
           <Link href="/public/about" className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
-            More about Nirman <ArrowRight className="size-4" aria-hidden />
+            More about BBAS <ArrowRight className="size-4" aria-hidden />
           </Link>
         </p>
       </Container>

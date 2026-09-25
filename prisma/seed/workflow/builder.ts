@@ -3,7 +3,7 @@ import type { PrismaClient } from '@prisma/client';
 /**
  * THE WORKFLOW SEEDER, AS A MECHANISM.
  *
- * Nirman runs more than one approval chain. `bp-standard.ts` holds the
+ * BBAS runs more than one approval chain. `bp-standard.ts` holds the
  * six-desk hierarchy the system shipped with; `bbas-standard.ts` holds the
  * four-desk chain the BBAS manuals describe. Both are DATA — the same shape,
  * seeded by the same code — and this file is the code.

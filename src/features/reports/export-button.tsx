@@ -54,7 +54,7 @@ export function ExportButton({ data, disabled }: { data: any, disabled?: boolean
       XLSX.utils.book_append_sheet(wb, wsWorkload, 'Officer Workload');
     }
 
-    XLSX.writeFile(wb, `Nirman_Analytics_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.writeFile(wb, `BBAS_Analytics_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   return (

@@ -59,7 +59,7 @@ export const LAYOUTS = [
 export const FIRMS = [
   'Kumar & Associates', 'Skyline Design Studio', 'Aakriti Architects',
   'Vastu Consultants', 'Meridian Planners', 'Sthapati Design Works',
-  'BluePrint Engineering', 'Nirman Consultancy', 'Axis Architects',
+  'BluePrint Engineering', 'BBAS Consultancy', 'Axis Architects',
   'Prabhava Design Collective',
 ] as const;
 

@@ -20,7 +20,7 @@ import { Container } from './primitives';
  *
  * ── Identity, and what it is not ────────────────────────────────────────
  *
- * The brand is Nirman's own — its logo and name. No government seal is shown
+ * The brand is BBAS's own — its logo and name. No government seal is shown
  * because none has been supplied, and the portal says on every page that it is
  * a demonstration. It is a BBAS-STYLE portal, not the official one.
  *
@@ -41,32 +41,73 @@ export function PublicShell({ children, appName, isSignedIn }: { children: React
 
   return (
     <div className="public-portal flex min-h-screen flex-col bg-bg text-text">
-      <header>
-        <div className="bg-slate-900 text-white">
-          <Container className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1.5 py-1.5">
-            <p className="text-caption text-slate-300">BBAS-style Building Permission Demo · not an official government website</p>
-            <Preferences />
-          </Container>
-        </div>
-
-        <div className="border-b border-border bg-surface">
-          <Container className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 py-4">
-            <Link href="/" className="flex items-center gap-3 rounded-lg focus-visible:outline-2" aria-label={`${appName} — Building Permission Authority, home`}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/portal/nirman-logo.jpg" alt="" width={56} height={56} className="size-14 rounded-xl object-cover shadow-card" />
-              <span>
-                <span className="block text-2xl font-extrabold leading-none tracking-wide text-text">NIRMAN</span>
-                <span className="mt-1 block text-small font-medium text-text-muted">Building Permission Authority</span>
-              </span>
-            </Link>
-            <div className="text-left sm:text-right">
-              <p className="text-h1 font-semibold text-text">Building Permission Portal</p>
-              <p className="text-small text-text-muted">BBAS-style Building Permission Demo · BIM Based Building Approval</p>
+      <header className="bg-white">
+        {/* Top Accessibility Bar */}
+        <div className="border-b border-border text-xs text-text-muted font-medium bg-[#fafafa]">
+          <Container className="flex justify-end items-center gap-3 py-1.5 px-4">
+            <a href="#main-content" className="hover:underline">Skip to Main Content</a>
+            <span className="text-border">|</span>
+            <div className="flex items-center gap-1.5">
+              <button className="flex items-center justify-center h-5 w-5 rounded-full bg-slate-500 text-white text-[10px] hover:bg-slate-600">A+</button>
+              <button className="flex items-center justify-center h-5 w-5 rounded-full bg-slate-500 text-white text-[10px] hover:bg-slate-600">A</button>
+              <button className="flex items-center justify-center h-5 w-5 rounded-full bg-slate-500 text-white text-[10px] hover:bg-slate-600">A-</button>
             </div>
+            <span className="text-border">|</span>
+            <div className="flex items-center gap-1.5">
+              <button className="h-5 w-5 rounded-full bg-[#1e1346] hover:opacity-80 border border-transparent" aria-label="High contrast theme"></button>
+              <button className="h-5 w-5 rounded-full border border-border bg-white hover:opacity-80" aria-label="Default theme"></button>
+            </div>
+            <span className="text-border">|</span>
+            <button className="hover:underline">Screen Reader Access</button>
           </Container>
         </div>
 
-        <div className="relative">
+        {/* Logo / Title Bar */}
+        <div className="border-b border-border py-2 bg-[#fdfaf2]">
+          <Container className="flex items-center justify-between px-4">
+            
+            {/* Left side: Minister */}
+            <div className="flex items-center gap-4">
+              <img src="/portal/minister.png" alt="Minister Sri Ponguru Narayana" className="h-20 w-auto object-contain drop-shadow-sm" />
+              <div className="hidden md:block">
+                <p className="text-[#8c1c13] font-bold text-sm tracking-wide">Sri Ponguru Narayana</p>
+                <p className="text-xs text-slate-800 font-medium">Hon'ble Minister for MA&UD</p>
+                <p className="text-xs text-slate-800 font-medium">Andhra Pradesh Government</p>
+              </div>
+            </div>
+
+            {/* Center-left: APCRDA */}
+            <div className="hidden lg:flex items-center justify-center">
+              <img src="/portal/apcrda.png" alt="APCRDA Logo" className="h-16 w-auto object-contain" />
+            </div>
+
+            {/* Center: BBAS */}
+            <div className="text-center px-4">
+              <h1 className="text-[#8c1c13] text-4xl md:text-5xl font-extrabold tracking-widest leading-none font-sans">
+                BBAS
+              </h1>
+            </div>
+
+            {/* Center-right: AP Govt Logo */}
+            <div className="hidden lg:flex items-center justify-center">
+              <img src="/portal/ap-logo.jpg" alt="AP Government Logo" className="h-16 w-16 object-contain rounded-full mix-blend-multiply" />
+            </div>
+
+            {/* Right side: Chief Minister */}
+            <div className="flex items-center gap-4 text-right">
+              <div className="hidden md:block">
+                <p className="text-[#8c1c13] font-bold text-sm tracking-wide">Sri Nara Chandrababu Naidu</p>
+                <p className="text-xs text-slate-800 font-medium">Hon'ble Chief Minister</p>
+                <p className="text-xs text-slate-800 font-medium">Andhra Pradesh Government</p>
+              </div>
+              <img src="/portal/cm.png" alt="Chief Minister Sri Nara Chandrababu Naidu" className="h-20 w-auto object-contain drop-shadow-sm" />
+            </div>
+
+          </Container>
+        </div>
+
+        {/* Navigation Bar */}
+        <div className="relative border-b border-border bg-[#fafafa]">
           <PublicNav items={items} />
         </div>
       </header>
@@ -78,7 +119,7 @@ export function PublicShell({ children, appName, isSignedIn }: { children: React
       <footer className="mt-auto border-t border-border bg-slate-900 text-slate-200">
         <Container className="grid gap-8 py-10 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-3">
-            <p className="text-lg font-bold tracking-wide text-white">NIRMAN</p>
+            <p className="text-lg font-bold tracking-wide text-white">BBAS</p>
             <p className="text-small text-slate-300">A BBAS-style building permission demonstration: citizens, developers, LTPs and Town Planning Assistants, on one portal.</p>
           </div>
           <FooterList title="Portal Map" links={FOOTER_PORTAL_MAP} />
@@ -87,7 +128,7 @@ export function PublicShell({ children, appName, isSignedIn }: { children: React
         </Container>
         <div className="border-t border-white/10">
           <Container className="py-4 text-caption text-slate-400">
-            <p>© Nirman / Demo Building Permission Authority. A demonstration system — it is not the official APCRDA BBAS portal, and nothing filed here has any legal effect.</p>
+            <p>© BBAS / Demo Building Permission Authority. A demonstration system — it is not the official APCRDA BBAS portal, and nothing filed here has any legal effect.</p>
           </Container>
         </div>
       </footer>

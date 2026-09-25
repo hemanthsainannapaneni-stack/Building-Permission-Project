@@ -96,15 +96,7 @@ export function PageFrame({
 
 /** The one line every demonstration surface carries. */
 export function DemoBanner({ children }: { children?: React.ReactNode }) {
-  return (
-    <div role="note" className="flex items-start gap-2.5 rounded-lg border border-warning/40 bg-warning-bg px-4 py-3 text-small text-text">
-      <FlaskConical className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
-      <p>
-        <strong className="font-semibold">Demo. </strong>
-        {children ?? DEMO_NOTICE}
-      </p>
-    </div>
-  );
+  return null;
 }
 
 export function Panel({

@@ -35,7 +35,7 @@ export const BBAS_INTRO = {
   paragraphs: [
     'BBAS-style systems put building permission online. A Licensed Technical Person (LTP) prepares the application, attaches the drawings or BIM model, pays the fee and follows the file until a Building Permission Order is issued.',
     'Inside the authority the file passes through named desks — scrutiny, inspection, verification and approval — and every step is recorded. After approval the same file carries on through commencement of work and, later, occupancy.',
-    'Nirman is a BBAS-style Building Permission Demo. It is a demonstration system, not the official APCRDA BBAS portal. This public portal is the part anyone can open: citizens track a file and its fees, and developers, LTPs and Town Planning Assistants are registered, renewed and listed.',
+    'BBAS is a BBAS-style Building Permission Demo. It is a demonstration system, not the official APCRDA BBAS portal. This public portal is the part anyone can open: citizens track a file and its fees, and developers, LTPs and Town Planning Assistants are registered, renewed and listed.',
   ],
   steps: [
     { title: 'Prepare', text: 'The LTP fills in the application and attaches the drawings or BIM model.' },
@@ -121,7 +121,7 @@ export const FAQ_ITEMS: readonly FaqItem[] = [
     id: 'how-to-apply',
     question: 'How do I apply for a building permission?',
     answer: [
-      'Applications are prepared and submitted by a Licensed Technical Person (LTP) who signs in to the Nirman workspace. The LTP enters the plot and building details, attaches the drawings or BIM model and the required documents, and submits the file.',
+      'Applications are prepared and submitted by a Licensed Technical Person (LTP) who signs in to the BBAS workspace. The LTP enters the plot and building details, attaches the drawings or BIM model and the required documents, and submits the file.',
       'If you are an owner, ask your LTP to file the application. You can then follow it from this portal with the application number.',
     ],
     href: '/public/downloads#application-guidelines',
@@ -180,7 +180,7 @@ export const FAQ_ITEMS: readonly FaqItem[] = [
   {
     id: 'demo',
     question: 'Is this an official government portal?',
-    answer: ['No. Nirman is a demonstration system. The people, organisations, numbers and announcements you see are fictional, and nothing filed here has any legal effect.'],
+    answer: ['No. BBAS is a demonstration system. The people, organisations, numbers and announcements you see are fictional, and nothing filed here has any legal effect.'],
   },
   {
     id: 'help',
@@ -203,16 +203,16 @@ export const HELPDESK = {
     'A file’s status, or a number that will not search',
     'Registering or renewing a developer or an LTP',
     'A document that will not upload',
-    'Signing in to the Nirman workspace',
+    'Signing in to the BBAS workspace',
   ],
-  email: 'helpdesk@nirman.example',
+  email: 'helpdesk@bbas.example',
   phone: '000-0000-0000',
 };
 
 export const CONTACT = {
-  organisation: 'Nirman — Building Permission Authority (demonstration)',
-  address: ['Demonstration address', 'Not a real office', 'Nirman project team'],
-  email: 'contact@nirman.example',
+  organisation: 'BBAS — Building Permission Authority (demonstration)',
+  address: ['Demonstration address', 'Not a real office', 'BBAS project team'],
+  email: 'contact@bbas.example',
   phone: '000-0000-0000',
 };
 
@@ -261,7 +261,7 @@ export const DOWNLOAD_ITEMS: readonly DownloadItem[] = [
   { slug: 'portal-user-manual', category: 'user-manuals', title: 'Using the public portal', summary: 'A short guide to the public services: searching, registering, renewing and downloading.', kind: 'DEMO_GUIDE', format: 'PDF' },
   { slug: 'applicant-workspace-manual-placeholder', category: 'user-manuals', title: 'Applicant (LTP) workspace manual', summary: 'A placeholder for the full user manual for LTPs. No official manual has been supplied.', kind: 'PLACEHOLDER', format: 'PDF' },
   { slug: 'how-to-apply-guide', category: 'application-guidelines', title: 'How to apply — a walkthrough', summary: 'Preparing and submitting a building permission application, in order.', kind: 'DEMO_GUIDE', format: 'PDF' },
-  { slug: 'document-checklist', category: 'application-guidelines', title: 'Document checklist for building permission', summary: 'The document types configured in Nirman and when each is required, as a spreadsheet.', kind: 'LIVE', format: 'CSV' },
+  { slug: 'document-checklist', category: 'application-guidelines', title: 'Document checklist for building permission', summary: 'The document types configured in BBAS and when each is required, as a spreadsheet.', kind: 'LIVE', format: 'CSV' },
   { slug: 'building-permission-process', category: 'building-permission-information', title: 'The building permission process at a glance', summary: 'From preparation to permission and after, as this demonstration models it.', kind: 'DEMO_GUIDE', format: 'PDF' },
   { slug: 'fees-and-payment-information', category: 'building-permission-information', title: 'Fees and payment in this demonstration', summary: 'How a fee demand is raised and paid here, and what “demo payment” means. No fee amounts are stated.', kind: 'DEMO_GUIDE', format: 'PDF' },
   { slug: 'ltp-registration-guide', category: 'ltp-guidelines', title: 'LTP registration and renewal — guide', summary: 'What the LTP registration and renewal forms ask for, and what happens after you submit.', kind: 'DEMO_GUIDE', format: 'PDF' },
@@ -291,7 +291,7 @@ const form = (title: string, intro: string, sections: GuideSection[]) => ({ titl
 export const DEMO_GUIDES: Record<string, { title: string; intro: string; sections: GuideSection[] }> = {
   'portal-user-manual': {
     title: 'Using the public portal',
-    intro: 'A short guide to what the public pages of Nirman offer. It describes this demonstration only.',
+    intro: 'A short guide to what the public pages of BBAS offer. It describes this demonstration only.',
     sections: [
       { heading: 'Follow a file', bullets: ['Open “Search your application status” and enter an application or proceeding number. Add the applicant’s mobile digits to see the applicant’s name.', 'Open “Pay your fees here” to see the fee demand and payment history, and to make a demonstration payment.'] },
       { heading: 'Developers', bullets: ['“Developer Registration” files a new registration with its documents.', '“Developer Registration Status” follows it by registration or reference number.', '“Developer Renewal” renews a registration that is due or has lapsed.', '“List of Registered Developer” is the public register.'] },
@@ -321,11 +321,11 @@ export const DEMO_GUIDES: Record<string, { title: string; intro: string; section
   },
   'fees-and-payment-information': {
     title: 'Fees and payment in this demonstration',
-    intro: 'How fees work in Nirman. No fee amount is stated here: amounts come from the configured fee schedule.',
+    intro: 'How fees work in BBAS. No fee amount is stated here: amounts come from the configured fee schedule.',
     sections: [
       { heading: 'Where a fee comes from', paragraphs: ['When the documents are complete the system calculates the fee from the fee schedule configured for the permission type and raises a demand. The calculation is frozen on the demand.'] },
       { heading: 'Paying', bullets: ['The applicant pays from the workspace’s Payments tab.', 'The public “Pay your fees here” page shows the demand and offers a demonstration payment.', 'Every online payment in this demonstration goes through a demonstration gateway. No real transaction is ever processed and every receipt is marked as a demonstration.'] },
-      { heading: 'Renewal fees', paragraphs: ['Developer and LTP renewals show a demonstration fee taken from system settings, to show the shape of the flow. Nirman has no fee engine for registrations, so that fee is a labelled demonstration record, not a published fee.'] },
+      { heading: 'Renewal fees', paragraphs: ['Developer and LTP renewals show a demonstration fee taken from system settings, to show the shape of the flow. BBAS has no fee engine for registrations, so that fee is a labelled demonstration record, not a published fee.'] },
     ],
   },
   'ltp-registration-guide': {

@@ -25,8 +25,8 @@ import { cn } from '@/lib/utils';
  * buttons still work for the current visit.
  */
 
-const SIZE_KEY = 'nirman.public.textSize';
-const CONTRAST_KEY = 'nirman.public.contrast';
+const SIZE_KEY = 'bbas.public.textSize';
+const CONTRAST_KEY = 'bbas.public.contrast';
 const STEPS = [-1, 0, 1, 2] as const;
 type Step = (typeof STEPS)[number];
 const PERCENT: Record<Step, number> = { '-1': 90, '0': 100, '1': 112.5, '2': 125 };

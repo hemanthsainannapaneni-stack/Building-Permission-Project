@@ -1,9 +1,9 @@
-# NIRMAN — Phase 0 Repository Audit
+# BBAS — Phase 0 Repository Audit
 
 **Date:** 2026-09-11
 **Branch:** `main` @ `9fba910`
-**Scope:** Compare the existing Nirman implementation against the BBAS master brief and the four BBAS manuals (LTP workflow, TPA user manual, ZDD user manual, JD portal workflow report).
-**Verdict:** Nirman is a genuinely mature, data-driven platform. The BBAS brief is an **extension**, not a rebuild. Roughly 40% of the brief already exists in some form; the remaining 60% is new modules that the existing engine, schema conventions and UI kit can carry without architectural change.
+**Scope:** Compare the existing BBAS implementation against the BBAS master brief and the four BBAS manuals (LTP workflow, TPA user manual, ZDD user manual, JD portal workflow report).
+**Verdict:** BBAS is a genuinely mature, data-driven platform. The BBAS brief is an **extension**, not a rebuild. Roughly 40% of the brief already exists in some form; the remaining 60% is new modules that the existing engine, schema conventions and UI kit can carry without architectural change.
 
 ---
 
@@ -227,7 +227,7 @@ I will stop after Phase 1 and report before starting Phase 2, per §BG.
 
 ---
 
-# NIRMAN — Phase 4 record
+# BBAS — Phase 4 record
 
 **Application checklist · Others · General information, applicant and plot.**
 

@@ -94,7 +94,7 @@ export function demoBimFor(src: DemoBimSource) {
     eastings: utm.easting,
     northings: utm.northing,
     author: src.ltpName ?? 'LTP',
-    organization: src.firm ?? 'Nirman LTP',
+    organization: src.firm ?? 'BBAS LTP',
     originatingSystem: tool.system,
   });
 

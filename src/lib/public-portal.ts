@@ -88,9 +88,9 @@ export const SERVICE_SECTIONS: readonly PortalSection[] = [CITIZEN_SERVICE, DEVE
 export const HOME_LINK: PortalLink = { key: 'home', label: 'Home', href: '/', summary: 'The portal’s front page.' };
 export const DASHBOARD_LINK: PortalLink = { key: 'dashboard', label: 'Dashboard', href: '/public/dashboard', summary: 'Live counts of applications and permissions issued.' };
 export const DOWNLOADS_LINK: PortalLink = { key: 'downloads', label: 'Downloads', href: '/public/downloads', summary: 'Guides, help manuals and reference documents.' };
-export const LOGIN_LINK: PortalLink = { key: 'login', label: 'Login', href: LOGIN_HREF, summary: 'Sign in to the Nirman workspace.' };
+export const LOGIN_LINK: PortalLink = { key: 'login', label: 'Login', href: LOGIN_HREF, summary: 'Sign in to the BBAS workspace.' };
 
-export const ABOUT_LINK: PortalLink = { key: 'about', label: 'About Us', href: '/public/about', summary: 'What Nirman is, and what BIM and BBAS mean here.' };
+export const ABOUT_LINK: PortalLink = { key: 'about', label: 'About Us', href: '/public/about', summary: 'What BBAS is, and what BIM and BBAS mean here.' };
 export const HELP_MANUALS_LINK: PortalLink = { key: 'help-manuals', label: 'Help Manuals', href: '/public/downloads#user-manuals', summary: 'Step-by-step guides for applicants.' };
 export const FAQ_LINK: PortalLink = { key: 'faq', label: 'FAQ', href: '/public/faq', summary: 'Answers to common questions.' };
 export const HELPDESK_LINK: PortalLink = { key: 'helpdesk', label: 'Helpdesk', href: '/public/helpdesk', summary: 'How to get help, and when.' };
@@ -178,4 +178,4 @@ export type DashboardStatusFilter = (typeof DASHBOARD_STATUS_FILTERS)[number]['v
 export const isDashboardStatusFilter = (v: string): v is DashboardStatusFilter => DASHBOARD_STATUS_FILTERS.some((f) => f.value === v);
 
 /** The one sentence every demonstration surface carries, so nobody mistakes it for an official site. */
-export const DEMO_NOTICE = 'Demonstration portal. Nirman is a demonstration system and is not an official government website; records shown here are fictional.';
+export const DEMO_NOTICE = 'Demonstration portal. BBAS is a demonstration system and is not an official government website; records shown here are fictional.';

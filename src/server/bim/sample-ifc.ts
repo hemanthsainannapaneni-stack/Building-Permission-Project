@@ -52,9 +52,9 @@ export function buildSampleIfc(input: SampleIfcInput): string {
   };
 
   const person = add(`IFCPERSON($,${s(input.author ?? 'LTP')},$,$,$,$,$,$)`);
-  const org = add(`IFCORGANIZATION($,${s(input.organization ?? 'Nirman')},$,$,$)`);
+  const org = add(`IFCORGANIZATION($,${s(input.organization ?? 'BBAS')},$,$,$)`);
   const pando = add(`IFCPERSONANDORGANIZATION(${person},${org},$)`);
-  const app = add(`IFCAPPLICATION(${org},'1.0',${s(input.originatingSystem ?? 'Nirman BIM sample')},'NIRMAN')`);
+  const app = add(`IFCAPPLICATION(${org},'1.0',${s(input.originatingSystem ?? 'BBAS BIM sample')},'BBAS')`);
   const owner = add(`IFCOWNERHISTORY(${pando},${app},$,.ADDED.,$,$,$,0)`);
 
   const mm = add('IFCSIUNIT(*,.LENGTHUNIT.,.MILLI.,.METRE.)');
@@ -119,7 +119,7 @@ export function buildSampleIfc(input: SampleIfcInput): string {
     'ISO-10303-21;',
     'HEADER;',
     "FILE_DESCRIPTION(('ViewDefinition [ReferenceView_V1.2]'),'2;1');",
-    `FILE_NAME(${s(`${input.projectName}.ifc`)},${s(input.timeStamp ?? new Date().toISOString().slice(0, 19))},(${s(input.author ?? 'LTP')}),(${s(input.organization ?? 'Nirman')}),'IfcOpenShell',${s(input.originatingSystem ?? 'Nirman BIM sample')},'');`,
+    `FILE_NAME(${s(`${input.projectName}.ifc`)},${s(input.timeStamp ?? new Date().toISOString().slice(0, 19))},(${s(input.author ?? 'LTP')}),(${s(input.organization ?? 'BBAS')}),'IfcOpenShell',${s(input.originatingSystem ?? 'BBAS BIM sample')},'');`,
     "FILE_SCHEMA(('IFC4'));",
     'ENDSEC;',
     'DATA;',

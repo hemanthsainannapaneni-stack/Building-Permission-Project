@@ -13,7 +13,7 @@ import { PublicShell } from '@/features/public-portal/shell';
  * grants nothing.
  */
 export const metadata: Metadata = {
-  title: { default: 'Nirman | Building Permission Portal', template: 'Nirman | %s' },
+  title: { default: 'BBAS | Building Permission Portal', template: 'BBAS | %s' },
   description: 'A BBAS-style building permission demonstration: track applications and fees, register and renew developers and LTPs, and browse the public registers.',
 };
 

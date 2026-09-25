@@ -7,10 +7,10 @@ export const metadata: Metadata = { title: 'About Us' };
 
 export default function AboutPage() {
   return (
-    <PageFrame title="About Us" intro="Nirman is a BBAS-style building permission demonstration. This is what it is, who it is for, and what it is not." crumbs={[]} demo>
-      <Panel title="About Nirman">
+    <PageFrame title="About Us" intro="BBAS is a BBAS-style building permission demonstration. This is what it is, who it is for, and what it is not." crumbs={[]} demo>
+      <Panel title="About BBAS">
         <div className="max-w-3xl space-y-3 text-body text-text-muted">
-          <p>Nirman is a working demonstration of an online building permission system: applications prepared by Licensed Technical Persons, scrutiny of drawings and BIM models, fee demands and payments, department review through named desks, permission orders, and the registers of developers, LTPs and Town Planning Assistants.</p>
+          <p>BBAS is a working demonstration of an online building permission system: applications prepared by Licensed Technical Persons, scrutiny of drawings and BIM models, fee demands and payments, department review through named desks, permission orders, and the registers of developers, LTPs and Town Planning Assistants.</p>
           <p>It is modelled on the structure of the BBAS building approval system so that the whole journey can be shown end to end. It is <strong className="text-text">not</strong> the official APCRDA BBAS portal, it carries no government seal, and every person, organisation, number and announcement in it is fictional.</p>
         </div>
       </Panel>
