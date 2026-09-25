@@ -50,14 +50,14 @@ export function ProfessionalTab({ initial }: { initial: ApplicationProfessionalP
         <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2 space-y-0">
           <div>
             <CardTitle className="flex items-center gap-2">
-              <UserRoundCog className="size-4" /> Technical professional
+              <UserRoundCog className="size-4" /> LTP
             </CardTitle>
-            <CardDescription>The professional who holds this file now, and may submit drawings on it.</CardDescription>
+            <CardDescription>The LTP who holds this file now, and may submit drawings on it.</CardDescription>
           </div>
           {offer.offered &&
             (offer.available ? (
               <Button variant="secondary" onClick={() => setOpen(true)}>
-                Register change of professional
+                Register change of LTP
               </Button>
             ) : (
               <p className="flex max-w-sm items-start gap-1.5 text-caption text-text-muted">
@@ -88,7 +88,7 @@ export function ProfessionalTab({ initial }: { initial: ApplicationProfessionalP
               </div>
             </dl>
           ) : (
-            <p className="text-small text-text-muted">No professional is recorded on this file.</p>
+            <p className="text-small text-text-muted">No LTP is recorded on this file.</p>
           )}
         </CardContent>
       </Card>
@@ -115,7 +115,7 @@ export function ProfessionalTab({ initial }: { initial: ApplicationProfessionalP
                   {data.requests.map((r) => (
                     <tr key={r.id} className="border-b border-border last:border-0">
                       <td className="py-1.5 pr-3">
-                        <Link href={`/professional-changes/${r.id}`} className="font-medium text-primary hover:underline">
+                        <Link href={`/ltp-changes/${r.id}`} className="font-medium text-primary hover:underline">
                           {r.requestNumber}
                         </Link>
                       </td>
@@ -133,7 +133,7 @@ export function ProfessionalTab({ initial }: { initial: ApplicationProfessionalP
               </table>
             </div>
           ) : (
-            <p className="text-small text-text-muted">No change of professional has been requested on this file.</p>
+            <p className="text-small text-text-muted">No change of LTP has been requested on this file.</p>
           )}
         </CardContent>
       </Card>
@@ -180,7 +180,7 @@ function RequestDialog({
         form.set('demoKinds', demo.join(','));
       }
       const result = await postForm<{ message: string }>(`/api/applications/${data.application.id}/professional-change`, form);
-      toast.success('Change of professional registered', { description: result.message });
+      toast.success('Change of LTP registered', { description: result.message });
       await onDone();
     } catch (error) {
       setErrors(reportError(error, 'The request could not be registered.'));
@@ -193,20 +193,20 @@ function RequestDialog({
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Register change of professional — {data.application.applicationNumber}</DialogTitle>
+          <DialogTitle>Register change of LTP — {data.application.applicationNumber}</DialogTitle>
           <DialogDescription>
-            On receipt of the owner’s letter. {currentName ? `${currentName} continues to hold the file` : 'The current professional continues'} until the request is
+            On receipt of the owner’s letter. {currentName ? `${currentName} continues to hold the file` : 'The current LTP continues'} until the request is
             approved; the file itself does not move.
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="space-y-3">
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Current professional" htmlFor="pc-current">
+            <Field label="Current LTP" htmlFor="pc-current">
               <Input id="pc-current" value={currentName} disabled />
             </Field>
-            <Field label="Proposed professional" htmlFor="pc-proposed" required error={errors.proposedProfessionalId}>
+            <Field label="Proposed LTP" htmlFor="pc-proposed" required error={errors.proposedProfessionalId}>
               <select id="pc-proposed" className={`${selectClass} w-full`} value={proposed} onChange={(e) => setProposed(e.target.value)}>
-                <option value="">{data.professionals.length ? 'Choose from the professional register…' : 'No professional in the register is approved and in force'}</option>
+                <option value="">{data.professionals.length ? 'Choose from the LTP register…' : 'No LTP in the register is approved and in force'}</option>
                 {data.professionals.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name} — {p.registrationNumber} · {p.typeLabel} · licence {p.licenceNo}

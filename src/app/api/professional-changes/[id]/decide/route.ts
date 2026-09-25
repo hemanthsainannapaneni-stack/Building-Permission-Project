@@ -9,5 +9,5 @@ export const dynamic = 'force-dynamic';
 export const POST = defineRoute<DecideProfessionalChangeInput>(
   async ({ user, params, body, ip, userAgent, correlationId }) =>
     decideProfessionalChange(user, params.id, body, { ip, userAgent, correlationId }),
-  { capabilities: [CAPABILITIES.PROFESSIONAL_CHANGE_DECIDE], schema: decideProfessionalChangeSchema }
+  { capabilities: [CAPABILITIES.LTP_CHANGE_DECIDE], schema: decideProfessionalChangeSchema }
 );

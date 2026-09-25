@@ -153,14 +153,14 @@ describe('state machine and grants', () => {
       Object.entries(RBAC_MATRIX)
         .filter(([, c]) => (c as string[]).includes(cap))
         .map(([r]) => r);
-    expect(holders(CAPABILITIES.PROFESSIONAL_REG_REGISTER)).toEqual([ROLES.TPA]);
-    expect(holders(CAPABILITIES.PROFESSIONAL_REG_VERIFY)).toEqual([ROLES.PLANNING_OFFICER]);
-    expect(holders(CAPABILITIES.PROFESSIONAL_REG_DECIDE)).toEqual([ROLES.ZJD]);
+    expect(holders(CAPABILITIES.LTP_REG_REGISTER)).toEqual([ROLES.TPA]);
+    expect(holders(CAPABILITIES.LTP_REG_VERIFY)).toEqual([ROLES.PLANNING_OFFICER]);
+    expect(holders(CAPABILITIES.LTP_REG_DECIDE)).toEqual([ROLES.ZJD]);
     for (const cap of new Set(Object.values(PROFESSIONAL_STEP_CAPABILITY))) {
       for (const r of [ROLES.LTP, ROLES.SYSTEM_ADMIN, ROLES.VIEWER])
         expect(holders(cap)).not.toContain(r);
     }
-    expect(holders(CAPABILITIES.PROFESSIONAL_REG_VIEW)).not.toContain(ROLES.LTP);
+    expect(holders(CAPABILITIES.LTP_REG_VIEW)).not.toContain(ROLES.LTP);
   });
   it('renews only in the window, once, from the current approved or expired registration', () => {
     const base = {

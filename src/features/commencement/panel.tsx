@@ -187,7 +187,7 @@ export function CommencementPanel({ initial, showApplicationLink }: { initial: A
             <FileCheck2 className="size-4" /> Commencement notification
           </CardTitle>
           <CardDescription>
-            Given by the file’s technical professional on the owner’s behalf. Recorded as a step on the file’s workflow history; the file stays approved.
+            Given by the file’s LTP on the owner’s behalf. Recorded as a step on the file’s workflow history; the file stays approved.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">

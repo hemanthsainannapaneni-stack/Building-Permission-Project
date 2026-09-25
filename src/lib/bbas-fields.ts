@@ -152,7 +152,7 @@ export function professionalFacts(app: ApplicationDetail): Fact[] {
     ['Structural engineer', a.structuralEngineerName || null],
     ['Structural engineer mobile', a.structuralEngineerPhone || null],
     ['Structural engineer registration', a.structuralEngineerRegNo || null],
-    ['Professional registration reference', a.professionalRegistrationRef || null],
+    ['LTP registration reference', a.professionalRegistrationRef || null],
     ['Purpose of the building', a.usagePurpose || null],
   ];
 }

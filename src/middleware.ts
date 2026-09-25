@@ -21,6 +21,14 @@ const PUBLIC_PATHS = [
   '/reset-password',
   '/unauthorized',
   '/verify-order',
+  /*
+   * The public portal: every page under /public, and the home page at `/`
+   * (matched exactly below — `/` is a prefix of everything). These are the
+   * ONLY pages opened to a visitor with no session, and each reads through the
+   * whitelists in `src/server/public-portal/`. Nothing under the workspace's
+   * own routes (/dashboard, /applications, /tasks, /admin…) is added here.
+   */
+  '/public',
 ];
 
 const PUBLIC_API = [
@@ -81,7 +89,7 @@ const ACCESS_SECRET = (() => {
 export async function middleware(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
 
-  const isPublicPage = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  const isPublicPage = pathname === '/' || PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   const isPublicApi = PUBLIC_API.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
   const accessToken = req.cookies.get(ACCESS_COOKIE)?.value;
@@ -104,7 +112,9 @@ export async function middleware(req: NextRequest) {
   // session and redirects back to /login. Clear the bad pair and let the user
   // sign in again instead of looping forever.
   if (accessToken && !hasValidAccessToken) {
-    const response = NextResponse.redirect(new URL('/login', req.url));
+    // A public page has no reason to send a visitor to sign in: drop the bad pair and carry on.
+    // (`/login` itself still bounces once, so the form renders without the stale cookies.)
+    const response = isPublicPage && pathname !== '/login' ? NextResponse.next() : NextResponse.redirect(new URL('/login', req.url));
     response.cookies.delete(ACCESS_COOKIE);
     response.cookies.delete(REFRESH_COOKIE);
     return response;
@@ -123,8 +133,10 @@ export async function middleware(req: NextRequest) {
 
   const hasSession = hasValidAccessToken;
 
-  // Signed in and heading for the sign-in page — send them onward instead.
-  if (hasSession && (pathname === '/login' || pathname === '/')) {
+  // Signed in and heading for the sign-in page — send them onward instead. The home page is NOT
+  // redirected any more: `/` is the public portal, and a signed-in officer or LTP can read it (the
+  // header offers them their workspace instead of Login).
+  if (hasSession && pathname === '/login') {
     return NextResponse.redirect(new URL('/dashboard', req.url));
   }
 

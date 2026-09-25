@@ -88,7 +88,7 @@ export async function snapshotOf(tx: Tx, userId: string): Promise<ProfessionalSn
       roles: { select: { role: { select: { key: true } } } },
     },
   });
-  if (!u) throw businessRule('That professional could not be found.');
+  if (!u) throw businessRule('That LTP could not be found.');
   const registration = await fileHoldingRegistrationOf(tx, u.id);
   return {
     userId: u.id,
@@ -107,12 +107,12 @@ export async function snapshotOf(tx: Tx, userId: string): Promise<ProfessionalSn
 
 /** Refuses a proposed professional who could not lawfully hold the file. */
 function assertEligible(p: Awaited<ReturnType<typeof snapshotOf>>, currentId: string, on: Date) {
-  if (p.userId === currentId) throw businessRule('The proposed professional already holds this file.');
-  if (!p.isLtp || !p.licenceNo) throw businessRule(`${p.name} is not a registered technical professional.`);
+  if (p.userId === currentId) throw businessRule('The proposed LTP already holds this file.');
+  if (!p.isLtp || !p.licenceNo) throw businessRule(`${p.name} is not a registered LTP.`);
   if (p.status !== 'ACTIVE') throw businessRule(`${p.name}'s account is not active.`);
   if (!licenceValidOn(p.validUpto, on)) throw businessRule(`${p.name}'s licence (${p.licenceNo}) is not in force.`);
   // Phase 12: a file passes only to a professional the register has approved and holds in force.
-  if (!p.registrationNumber) throw businessRule(`${p.name} holds no approved professional registration in force.`);
+  if (!p.registrationNumber) throw businessRule(`${p.name} holds no approved LTP registration in force.`);
 }
 
 const strip = ({ status: _s, isLtp: _l, ...snap }: Awaited<ReturnType<typeof snapshotOf>>): ProfessionalSnapshot => snap;
@@ -156,7 +156,7 @@ export async function requestProfessionalChange(c: ProfessionalChangeCtx, payloa
   const reason = payload?.reason?.trim() ?? '';
   const documents = payload?.documents ?? [];
   if (!payload?.proposedProfessionalId || !payload.requestDate || reason.length < 10) {
-    throw businessRule('Register the change from the Technical Professional tab — it needs the proposed professional, the request date and the reason.');
+    throw businessRule('Register the change from the LTP tab — it needs the proposed LTP, the request date and the reason.');
   }
   const requestDate = new Date(payload.requestDate);
   if (Number.isNaN(requestDate.getTime()) || requestDate.getTime() > c.now.getTime() + 86_400_000) {
@@ -289,7 +289,7 @@ async function openRequest(c: ProfessionalChangeCtx, status: ProfessionalChangeS
     where: { applicationId: c.application.id, status, ...(id ? { id } : {}) },
     select: { id: true, requestNumber: true, status: true, documents: true, currentProfessionalId: true, proposedProfessionalId: true },
   });
-  if (!row) throw conflict('That change of professional request has already moved on. Reload to see where it stands.', 'STALE_WRITE');
+  if (!row) throw conflict('That change of LTP request has already moved on. Reload to see where it stands.', 'STALE_WRITE');
   return row;
 }
 
@@ -326,7 +326,7 @@ export async function verifyProfessionalChange(c: ProfessionalChangeCtx, payload
   const row = await openRequest(c, 'PENDING_VERIFICATION', payload?.requestId);
   if (!hasRelease(docs(row.documents).map((d) => d.kind))) {
     throw businessRule(
-      'Add the current professional’s NOC or the owner’s termination letter before verifying — the file cannot pass to a new professional without a release from the old one.'
+      'Add the current LTP’s NOC or the owner’s termination letter before verifying — the file cannot pass to a new LTP without a release from the old one.'
     );
   }
   await advance(
@@ -385,7 +385,7 @@ export async function decideProfessionalChange(
   // is not, the request was overtaken and approving it would replace the
   // wrong person.
   if (c.application.ltpUserId !== row.currentProfessionalId) {
-    throw conflict('This file is no longer held by the professional this request names. Reject it and register a fresh one.');
+    throw conflict('This file is no longer held by the LTP this request names. Reject it and register a fresh one.');
   }
   const incoming = await snapshotOf(c.tx, row.proposedProfessionalId);
   assertEligible(incoming, row.currentProfessionalId, c.now);

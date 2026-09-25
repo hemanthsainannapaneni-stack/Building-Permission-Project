@@ -276,6 +276,7 @@ export function DeveloperPanel({ initial }: { initial: DeveloperDetailPayload })
       )}
 
       <HistoryCard events={data.events} label={EVENT_LABEL} statusLabel={statusLabel} />
+      <AuditTrailCard rows={data.auditTrail} />
 
       {open === 'submit' && <SimpleDialog data={data} step="submit" onClose={() => setOpen(null)} onDone={reload} />}
       {open === 'takeUp' && <SimpleDialog data={data} step="takeUp" onClose={() => setOpen(null)} onDone={reload} />}
@@ -398,6 +399,41 @@ function ValidityCard({ data }: { data: DeveloperDetailPayload }) {
             )}
           </Item>
         </dl>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * The raw, tamper-evident record — the same `audit_logs` rows every other
+ * write in this system produces, hash-chained and never editable. Distinct
+ * from the History card above it: that is this registration's own step-by-
+ * step story; this is what the platform's audit system independently kept.
+ */
+function AuditTrailCard({ rows }: { rows: DeveloperDetailPayload['auditTrail'] }) {
+  if (!rows.length) return null;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Audit trail</CardTitle>
+        <CardDescription>Every write to this registration, in the platform’s hash-chained audit log — append-only, sequence numbers never reused.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ol className="space-y-2 text-small">
+          {rows.map((a) => (
+            <li key={a.id} className="border-l-2 border-border pl-3">
+              <p className="font-medium text-text">
+                #{a.seq} {a.action}
+                <span className="font-normal text-text-muted">
+                  {' '}
+                  — {a.actorName}
+                  {a.actorRoleKey && a.actorRoleKey !== 'SYSTEM' ? ` (${a.actorRoleKey})` : ''} · {fmtDate(a.occurredAt)}
+                </span>
+              </p>
+              {a.remarks && <p className="text-text-muted">{a.remarks}</p>}
+            </li>
+          ))}
+        </ol>
       </CardContent>
     </Card>
   );

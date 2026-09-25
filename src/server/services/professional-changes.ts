@@ -57,7 +57,7 @@ import { storeUpload } from './files';
  *
  * What this service decides, and the engine cannot: whether the step is THIS
  * officer's. A request moves desk to desk independently of the file, so the
- * answer is the step's capability (PROFESSIONAL_CHANGE_*) plus the officer's
+ * answer is the step's capability (LTP_CHANGE_*) plus the officer's
  * jurisdiction over the file — never a role name in code.
  */
 
@@ -113,8 +113,8 @@ export function deskLabel(roleKeys: string, status: string): string {
 // ═══════════════════════════════════════════════════════════════════════════
 
 function requireView(user: AuthUser) {
-  if (!can(user, CAPABILITIES.PROFESSIONAL_CHANGE_VIEW)) {
-    throw forbidden('Your role does not include change of technical professional requests.');
+  if (!can(user, CAPABILITIES.LTP_CHANGE_VIEW)) {
+    throw forbidden('Your role does not include change of LTP requests.');
   }
 }
 
@@ -176,7 +176,7 @@ async function workflowAllows(applicationId: string, actionCode: string): Promis
     select: { workflowId: true, currentStageId: true, status: true },
   });
   if (!instance?.currentStageId) {
-    return { allowed: false, reason: 'The file has not reached the department yet. The professional can be changed once it has.' };
+    return { allowed: false, reason: 'The file has not reached the department yet. The LTP can be changed once it has.' };
   }
   const t = await prisma.workflowTransition.findFirst({
     where: { workflowId: instance.workflowId, fromStageId: instance.currentStageId, isActive: true, action: { code: actionCode } },
@@ -184,7 +184,7 @@ async function workflowAllows(applicationId: string, actionCode: string): Promis
   });
   return t
     ? { allowed: true, reason: '' }
-    : { allowed: false, reason: 'The workflow does not allow a change of professional on this file at its current stage.' };
+    : { allowed: false, reason: 'The workflow does not allow a change of LTP on this file at its current stage.' };
 }
 
 type Offer = { offered: boolean; available: boolean; reason: string };
@@ -501,7 +501,7 @@ export async function getProfessionalChange(user: AuthUser, id: string) {
       verify,
       review,
       decide,
-      addDocuments: open && can(user, CAPABILITIES.PROFESSIONAL_CHANGE_REQUEST, CAPABILITIES.PROFESSIONAL_CHANGE_VERIFY),
+      addDocuments: open && can(user, CAPABILITIES.LTP_CHANGE_REQUEST, CAPABILITIES.LTP_CHANGE_VERIFY),
       demoDocumentAllowed: env.demoMode,
     },
   };
@@ -539,7 +539,7 @@ async function raise(
   meta: Meta
 ) {
   const roleKey = await actingRole(user, step);
-  if (!roleKey) throw forbidden('This step of a change of professional request is not your desk’s.');
+  if (!roleKey) throw forbidden('This step of a change of LTP request is not your desk’s.');
   const wf = await workflowAllows(applicationId, actionCode);
   if (!wf.allowed) throw conflict(wf.reason);
   return prisma.$transaction(
@@ -564,18 +564,18 @@ export async function requestProfessionalChange(
   requireView(user);
   const app = await requireApplication(user, applicationId);
   // Asked before any upload, so a refused caller never writes to storage.
-  if (!(await actingRole(user, 'REQUEST'))) throw forbidden('Your desk does not register change of professional requests.');
+  if (!(await actingRole(user, 'REQUEST'))) throw forbidden('Your desk does not register change of LTP requests.');
   const wf = await workflowAllows(app.id, ACTIONS.REQUEST_PROFESSIONAL_CHANGE);
   if (!wf.allowed) throw conflict(wf.reason);
   if (input.proposedProfessionalId === app.ltpUserId) {
-    throw badRequest('The proposed professional already holds this file.', [
-      { path: 'proposedProfessionalId', message: 'Choose a different professional.' },
+    throw badRequest('The proposed LTP already holds this file.', [
+      { path: 'proposedProfessionalId', message: 'Choose a different LTP.' },
     ]);
   }
   // Refused before any upload: the engine asks again inside its transaction.
   if (!(await eligibleProfessionals(app.ltpUserId)).some((p) => p.id === input.proposedProfessionalId)) {
-    throw badRequest('The proposed professional is not in the professional register, approved and in force.', [
-      { path: 'proposedProfessionalId', message: 'Choose a professional from the register.' },
+    throw badRequest('The proposed LTP is not in the LTP register, approved and in force.', [
+      { path: 'proposedProfessionalId', message: 'Choose an LTP from the register.' },
     ]);
   }
 
@@ -619,7 +619,7 @@ export async function addProfessionalChangeDocuments(
   requireView(user);
   const pre = await requireRequest(user, id);
   const roleKey = (await actingRole(user, 'REQUEST')) ?? (await actingRole(user, 'VERIFY'));
-  if (!roleKey) throw forbidden('Your desk does not add documents to change of professional requests.');
+  if (!roleKey) throw forbidden('Your desk does not add documents to change of LTP requests.');
   assertExpected(pre.status, input.expectedStatus);
   if (!isProfessionalChangeOpen(pre.status)) throw conflict('This request has been decided. Its documents can no longer change.');
 

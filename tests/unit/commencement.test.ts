@@ -102,7 +102,7 @@ describe('grants', () => {
     .filter(([, caps]) => caps.includes(CAPABILITIES.COMMENCEMENT_NOTIFY))
     .map(([role]) => role);
 
-  it('only the technical professional notifies', () => {
+  it('only the LTP notifies', () => {
     expect(holders).toEqual([ROLES.LTP]);
   });
 

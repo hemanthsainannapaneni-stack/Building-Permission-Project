@@ -26,7 +26,7 @@ import {
 } from '@/lib/bbas-fields';
 import { cn } from '@/lib/utils';
 import { api, ApiCallError } from './api';
-import { visibleTabs, isTabKey, type TabDef } from './application-tabs';
+import { visibleTabs, isTabKey, resolveTabKey, type TabDef } from './application-tabs';
 import { ApplicationTimeline } from './application-timeline';
 import { AuditPanel, type AuditRow } from './audit-panel';
 import { ChecklistTab } from '@/features/checklist/checklist-tab';
@@ -164,7 +164,7 @@ export function ApplicationDetailView({
   nocs: ApplicationNocsPayload | null;
   /** Null when the caller holds no SHOW_CAUSE_VIEW — the tab is hidden anyway. */
   proceedings: ApplicationProceedingsPayload | null;
-  /** Null when the caller holds no PROFESSIONAL_CHANGE_VIEW — the tab is hidden anyway. */
+  /** Null when the caller holds no LTP_CHANGE_VIEW — the tab is hidden anyway. */
   professional: ApplicationProfessionalPayload | null;
   /** Null before approval, or when the caller holds no COMMENCEMENT_VIEW. */
   commencement: ApplicationCommencementPayload | null;
@@ -177,7 +177,7 @@ export function ApplicationDetailView({
 
   const tabs = React.useMemo(() => visibleTabs(capabilities), [capabilities]);
 
-  const requested = searchParams.get('tab') ?? '';
+  const requested = resolveTabKey(searchParams.get('tab') ?? '');
   // An unavailable tab in the URL falls back to Overview rather than showing a
   // blank panel — deep links outlive the phases that made them valid.
   const active =
@@ -295,7 +295,7 @@ export function ApplicationDetailView({
 
         <TabsContent value="proceedings">{proceedings && <ProceedingsTab initial={proceedings} />}</TabsContent>
 
-        <TabsContent value="professional">{professional && <ProfessionalTab initial={professional} />}</TabsContent>
+        <TabsContent value="ltp">{professional && <ProfessionalTab initial={professional} />}</TabsContent>
 
         <TabsContent value="commencement">
           {commencement ? (
@@ -849,7 +849,7 @@ function Details({ application, meta }: { application: Detail; meta: Application
       {professionals.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Developer and professionals</CardTitle>
+            <CardTitle>Developer and LTPs</CardTitle>
             <CardDescription>
               The other parties on record, and the registration each is entered under.
             </CardDescription>

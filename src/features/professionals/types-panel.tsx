@@ -95,7 +95,7 @@ export function ProfessionalTypesPanel({ initial }: { initial: ProfessionalTypeA
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Add a professional type</CardTitle>
+          <CardTitle>Add an LTP type</CardTitle>
           <CardDescription>A switched-off type keeps its registrations; it simply accepts no new ones.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

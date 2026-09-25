@@ -8,5 +8,5 @@ export const dynamic = 'force-dynamic';
 /** Approves or rejects: VERIFIED → APPROVED | REJECTED. */
 export const POST = defineRoute(
   async ({ user, params, body, ip, userAgent, correlationId }) => decideProfessionalRegistration(user, params.id, body, { ip, userAgent, correlationId }),
-  { capabilities: [CAPABILITIES.PROFESSIONAL_REG_DECIDE], schema: professionalDecideSchema }
+  { capabilities: [CAPABILITIES.LTP_REG_DECIDE], schema: professionalDecideSchema }
 );

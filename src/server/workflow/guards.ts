@@ -370,22 +370,22 @@ const REGISTRY: Record<string, Guard> = {
       where: { applicationId: application.id, status: { in: [...OPEN_PROFESSIONAL_CHANGE_STATUSES] } },
       select: { requestNumber: true },
     });
-    return open ? no(`Change of professional request ${open.requestNumber} is still open on this file.`) : ok;
+    return open ? no(`Change of LTP request ${open.requestNumber} is still open on this file.`) : ok;
   },
 
   [GUARDS.PROFESSIONAL_CHANGE_PENDING_VERIFICATION]: async ({ tx, application }) => {
     const count = await tx.professionalChangeRequest.count({ where: { applicationId: application.id, status: 'PENDING_VERIFICATION' } });
-    return count > 0 ? ok : no('No change of professional request on this file is awaiting verification.');
+    return count > 0 ? ok : no('No change of LTP request on this file is awaiting verification.');
   },
 
   [GUARDS.PROFESSIONAL_CHANGE_UNDER_REVIEW]: async ({ tx, application }) => {
     const count = await tx.professionalChangeRequest.count({ where: { applicationId: application.id, status: 'UNDER_REVIEW' } });
-    return count > 0 ? ok : no('No verified change of professional request on this file is awaiting review.');
+    return count > 0 ? ok : no('No verified change of LTP request on this file is awaiting review.');
   },
 
   [GUARDS.PROFESSIONAL_CHANGE_PENDING_DECISION]: async ({ tx, application }) => {
     const count = await tx.professionalChangeRequest.count({ where: { applicationId: application.id, status: 'PENDING_DECISION' } });
-    return count > 0 ? ok : no('No reviewed change of professional request on this file is awaiting a decision.');
+    return count > 0 ? ok : no('No reviewed change of LTP request on this file is awaiting a decision.');
   },
 
   // ── Commencement of work ───────────────────────────────────────────────

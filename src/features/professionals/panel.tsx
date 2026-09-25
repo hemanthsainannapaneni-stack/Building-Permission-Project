@@ -123,7 +123,7 @@ export function ProfessionalPanel({ initial }: { initial: ProfessionalDetailPayl
           <div className="flex flex-wrap gap-2">
             {p.edit.offered && (
               <Button variant="secondary" asChild>
-                <Link href={`/professionals/${r.id}/edit`}>
+                <Link href={`/ltp/${r.id}/edit`}>
                   <FilePen className="size-4" /> Edit draft
                 </Link>
               </Button>
@@ -144,7 +144,7 @@ export function ProfessionalPanel({ initial }: { initial: ProfessionalDetailPayl
           {data.openRenewal && (
             <Note icon={<RefreshCw className="mt-0.5 size-3.5 shrink-0" />}>
               Renewal{' '}
-              <Link href={`/professionals/${data.openRenewal.id}`} className="text-primary hover:underline">
+              <Link href={`/ltp/${data.openRenewal.id}`} className="text-primary hover:underline">
                 {data.openRenewal.applicationNumber}
               </Link>{' '}
               is under way.
@@ -163,7 +163,7 @@ export function ProfessionalPanel({ initial }: { initial: ProfessionalDetailPayl
         </CardHeader>
         <CardContent>
           <dl className="grid gap-x-6 gap-y-3 text-small sm:grid-cols-2 lg:grid-cols-4">
-            <Item label="Professional type">{r.typeLabel}</Item>
+            <Item label="LTP type">{r.typeLabel}</Item>
             <Item label="Name">{r.name}</Item>
             <Item label="Portal account">{data.account ? `${data.account.name} · ${data.account.email}` : 'None linked'}</Item>
             <Item label="Qualification">{r.qualification || '—'}</Item>
@@ -232,12 +232,12 @@ export function ProfessionalPanel({ initial }: { initial: ProfessionalDetailPayl
         <Card>
           <CardHeader>
             <CardTitle>Registration and renewals</CardTitle>
-            <CardDescription>Every application under {r.registrationNumber ?? 'this professional'}, oldest first.</CardDescription>
+            <CardDescription>Every application under {r.registrationNumber ?? 'this LTP'}, oldest first.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-1 text-small">
             {data.chain.map((c) => (
               <p key={c.id} className={cn(c.id === r.id && 'font-medium')}>
-                <Link href={`/professionals/${c.id}`} className="text-primary hover:underline">
+                <Link href={`/ltp/${c.id}`} className="text-primary hover:underline">
                   {c.applicationNumber}
                 </Link>{' '}
                 · {PROFESSIONAL_KIND_LABEL[c.kind as ProfessionalKind] ?? c.kind} · <StatusBadge kind="professional" status={c.status} />
@@ -262,7 +262,7 @@ export function ProfessionalPanel({ initial }: { initial: ProfessionalDetailPayl
           onClose={() => setOpen(null)}
           onRenewed={(id) => {
             setOpen(null);
-            router.push(`/professionals/${id}`);
+            router.push(`/ltp/${id}`);
             router.refresh();
           }}
         />
@@ -573,7 +573,7 @@ function ShortfallDialog({ data, onClose, onDone }: DialogProps) {
   return (
     <Shell
       title={`Shortfall — ${r.applicationNumber}`}
-      description="The application waits on the professional until the register desk records their answer. Rejected documents are listed for you."
+      description="The application waits on the LTP until the register desk records their answer. Rejected documents are listed for you."
       onClose={onClose}
       busy={busy}
       disabled={!list.length || remarks.trim().length < 5}
@@ -609,13 +609,13 @@ function RespondDialog({ data, onClose, onDone }: DialogProps) {
       return postForm(`/api/professionals/${r.id}/respond`, form);
     });
   return (
-    <Shell title={`Record the professional’s answer — ${r.applicationNumber}`} description="The application returns to the verifying desk, which checks any fresh documents." onClose={onClose} busy={busy} disabled={remarks.trim().length < 10} action="Record answer" onSubmit={submit} wide>
+    <Shell title={`Record the LTP’s answer — ${r.applicationNumber}`} description="The application returns to the verifying desk, which checks any fresh documents." onClose={onClose} busy={busy} disabled={remarks.trim().length < 10} action="Record answer" onSubmit={submit} wide>
       <ul className="list-disc pl-5 text-small text-text-muted">
         {r.shortfallItems.map((i) => (
           <li key={i}>{i}</li>
         ))}
       </ul>
-      <Field label="What the professional supplied or corrected" htmlFor="pr-answer" required error={errors.remarks}>
+      <Field label="What the LTP supplied or corrected" htmlFor="pr-answer" required error={errors.remarks}>
         <Textarea id="pr-answer" rows={3} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
       </Field>
       <div className="space-y-2">
@@ -676,7 +676,7 @@ function VerifyDialog({ data, onClose, onDone }: DialogProps) {
 function DecideDialog({ data, decision, onClose, onDone }: DialogProps & { decision: 'APPROVED' | 'REJECTED' }) {
   const r = data.registration;
   const [remarks, setRemarks] = React.useState('');
-  const { busy, errors, run } = useSubmit(onDone, decision === 'APPROVED' ? 'Approved — the professional is available for applications' : 'Rejected');
+  const { busy, errors, run } = useSubmit(onDone, decision === 'APPROVED' ? 'Approved — the LTP is available for applications' : 'Rejected');
   return (
     <Shell
       title={`${decision === 'APPROVED' ? 'Approve' : 'Reject'} ${r.applicationNumber}`}
@@ -686,7 +686,7 @@ function DecideDialog({ data, decision, onClose, onDone }: DialogProps & { decis
           {decision === 'APPROVED'
             ? r.kind === 'RENEWAL'
               ? `Approving renews ${r.registrationNumber} and sends the letter to Outward.`
-              : `Approving issues a ${r.typeLabel.toLowerCase()} registration number and validity, sends the letter to Outward, and makes the professional available for applications.`
+              : `Approving issues a ${r.typeLabel.toLowerCase()} registration number and validity, sends the letter to Outward, and makes the LTP available for applications.`
             : 'Rejection is final for this application.'}
         </>
       }

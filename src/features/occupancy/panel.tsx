@@ -143,7 +143,7 @@ export function OccupancyPanel({ initial, showApplicationLink }: { initial: Appl
           <Card>
             <CardHeader>
               <CardTitle>Completion intimation — {occ.occupancyNumber}</CardTitle>
-              <CardDescription>Given by the technical professional on the owner’s behalf with the occupancy application.</CardDescription>
+              <CardDescription>Given by the LTP on the owner’s behalf with the occupancy application.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <dl className="grid gap-x-6 gap-y-3 text-small sm:grid-cols-2 lg:grid-cols-4">

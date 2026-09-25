@@ -8,5 +8,5 @@ export const dynamic = 'force-dynamic';
 /** Submits a completed draft: DRAFT → SUBMITTED (Pending). */
 export const POST = defineRoute(
   async ({ user, params, body, ip, userAgent, correlationId }) => submitProfessionalRegistration(user, params.id, body, { ip, userAgent, correlationId }),
-  { capabilities: [CAPABILITIES.PROFESSIONAL_REG_REGISTER], schema: professionalRemarksSchema }
+  { capabilities: [CAPABILITIES.LTP_REG_REGISTER], schema: professionalRemarksSchema }
 );

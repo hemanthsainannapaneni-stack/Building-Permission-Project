@@ -702,6 +702,184 @@ const TEMPLATES: TemplateSeed[] = [
     body: 'Occupancy application filed against {{applicationNumber}}. - {{orgShortName}}',
     variables: [A, 'orgShortName'],
   },
+  // ── Developer registration (Phase 11) — no applicationId, its own register.
+  // PROVISIONAL WORDING: no manual supplied to this project names this
+  // correspondence; replace freely.
+  {
+    eventCode: 'DEVELOPER_REGISTRATION_SUBMITTED',
+    channel: 'IN_APP',
+    subject: 'Developer registration submitted — {{registrationNumber}}',
+    body: '{{developerName}} — registration {{registrationNumber}} has been submitted and is ready to take up.',
+    variables: ['registrationNumber', 'developerName'],
+  },
+  {
+    eventCode: 'DEVELOPER_REGISTRATION_SUBMITTED',
+    channel: 'EMAIL',
+    subject: 'Developer registration submitted — {{registrationNumber}}',
+    body:
+      'Dear {{recipientName}},\n\n' +
+      'The developer registration {{registrationNumber}} for {{developerName}} has been submitted.\n\n' +
+      'Open it here: {{link}}\n\n' +
+      '{{orgName}}',
+    variables: ['registrationNumber', 'developerName', 'recipientName', 'link', 'orgName'],
+  },
+  {
+    eventCode: 'DEVELOPER_REGISTRATION_SUBMITTED',
+    channel: 'SMS',
+    subject: '',
+    body: 'Developer registration {{registrationNumber}} submitted for review. - {{orgShortName}}',
+    variables: ['registrationNumber', 'orgShortName'],
+  },
+  {
+    eventCode: 'DEVELOPER_REGISTRATION_SHORTFALL_RAISED',
+    channel: 'IN_APP',
+    subject: 'Shortfall raised — {{registrationNumber}}',
+    body: 'A shortfall has been raised on {{registrationNumber}}: {{items}}',
+    variables: ['registrationNumber', 'items'],
+  },
+  {
+    eventCode: 'DEVELOPER_REGISTRATION_SHORTFALL_RAISED',
+    channel: 'EMAIL',
+    subject: 'Shortfall raised on your registration — {{registrationNumber}}',
+    body:
+      'Dear {{recipientName}},\n\n' +
+      'A shortfall has been raised on developer registration {{registrationNumber}}:\n{{items}}\n\n' +
+      'Respond here: {{link}}\n\n' +
+      '{{orgName}}',
+    variables: ['registrationNumber', 'items', 'recipientName', 'link', 'orgName'],
+  },
+  {
+    eventCode: 'DEVELOPER_REGISTRATION_SHORTFALL_RAISED',
+    channel: 'SMS',
+    subject: '',
+    body: 'Shortfall raised on registration {{registrationNumber}}. Respond at {{link}} - {{orgShortName}}',
+    variables: ['registrationNumber', 'link', 'orgShortName'],
+  },
+  {
+    eventCode: 'DEVELOPER_REGISTRATION_RESPONSE_RECEIVED',
+    channel: 'IN_APP',
+    subject: 'Shortfall answered — {{registrationNumber}}',
+    body: 'The shortfall on {{registrationNumber}} has been answered and is back for review.',
+    variables: ['registrationNumber'],
+  },
+  {
+    eventCode: 'DEVELOPER_REGISTRATION_RESPONSE_RECEIVED',
+    channel: 'EMAIL',
+    subject: 'Shortfall answered — {{registrationNumber}}',
+    body:
+      'Dear {{recipientName}},\n\n' +
+      'The shortfall on developer registration {{registrationNumber}} has been answered and is back with the review desk.\n\n' +
+      'Open it here: {{link}}\n\n' +
+      '{{orgName}}',
+    variables: ['registrationNumber', 'recipientName', 'link', 'orgName'],
+  },
+  {
+    eventCode: 'DEVELOPER_REGISTRATION_RESPONSE_RECEIVED',
+    channel: 'SMS',
+    subject: '',
+    body: 'Shortfall answer received for registration {{registrationNumber}}. - {{orgShortName}}',
+    variables: ['registrationNumber', 'orgShortName'],
+  },
+  {
+    eventCode: 'DEVELOPER_REGISTRATION_REVIEW_REQUIRED',
+    channel: 'IN_APP',
+    subject: 'Decision required — {{registrationNumber}}',
+    body: '{{registrationNumber}} has been verified and awaits a decision.',
+    variables: ['registrationNumber'],
+  },
+  {
+    eventCode: 'DEVELOPER_REGISTRATION_REVIEW_REQUIRED',
+    channel: 'EMAIL',
+    subject: 'Decision required — {{registrationNumber}}',
+    body:
+      'Dear {{recipientName}},\n\n' +
+      'Developer registration {{registrationNumber}} has been verified and awaits your decision.\n\n' +
+      'Open it here: {{link}}\n\n' +
+      '{{orgName}}',
+    variables: ['registrationNumber', 'recipientName', 'link', 'orgName'],
+  },
+  {
+    eventCode: 'DEVELOPER_REGISTRATION_REVIEW_REQUIRED',
+    channel: 'SMS',
+    subject: '',
+    body: 'Registration {{registrationNumber}} verified, awaiting decision. - {{orgShortName}}',
+    variables: ['registrationNumber', 'orgShortName'],
+  },
+  {
+    eventCode: 'DEVELOPER_REGISTRATION_APPROVED',
+    channel: 'IN_APP',
+    subject: 'Registration approved — {{registrationNumber}}',
+    body: '{{developerName}} is registered as {{registrationNumber}}, valid {{validFrom}} to {{validTo}}.',
+    variables: ['registrationNumber', 'developerName', 'validFrom', 'validTo'],
+  },
+  {
+    eventCode: 'DEVELOPER_REGISTRATION_APPROVED',
+    channel: 'EMAIL',
+    subject: 'Registration approved — {{registrationNumber}}',
+    body:
+      'Dear {{recipientName}},\n\n' +
+      'Your developer registration {{registrationNumber}} has been approved, valid from {{validFrom}} to {{validTo}}.\n\n' +
+      'View it here: {{link}}\n\n' +
+      '{{orgName}}',
+    variables: ['registrationNumber', 'validFrom', 'validTo', 'recipientName', 'link', 'orgName'],
+  },
+  {
+    eventCode: 'DEVELOPER_REGISTRATION_APPROVED',
+    channel: 'SMS',
+    subject: '',
+    body: 'Registered as {{registrationNumber}}, valid to {{validTo}}. - {{orgShortName}}',
+    variables: ['registrationNumber', 'validTo', 'orgShortName'],
+  },
+  {
+    eventCode: 'DEVELOPER_REGISTRATION_REJECTED',
+    channel: 'IN_APP',
+    subject: 'Registration rejected — {{registrationNumber}}',
+    body: 'Developer registration {{registrationNumber}} was rejected: {{decisionRemarks}}',
+    variables: ['registrationNumber', 'decisionRemarks'],
+  },
+  {
+    eventCode: 'DEVELOPER_REGISTRATION_REJECTED',
+    channel: 'EMAIL',
+    subject: 'Registration rejected — {{registrationNumber}}',
+    body:
+      'Dear {{recipientName}},\n\n' +
+      'Your developer registration {{registrationNumber}} was rejected.\n\nReasons: {{decisionRemarks}}\n\n' +
+      'View it here: {{link}}\n\n' +
+      '{{orgName}}',
+    variables: ['registrationNumber', 'decisionRemarks', 'recipientName', 'link', 'orgName'],
+  },
+  {
+    eventCode: 'DEVELOPER_REGISTRATION_REJECTED',
+    channel: 'SMS',
+    subject: '',
+    body: 'Registration {{registrationNumber}} was rejected. Details: {{link}} - {{orgShortName}}',
+    variables: ['registrationNumber', 'link', 'orgShortName'],
+  },
+  {
+    eventCode: 'DEVELOPER_REGISTRATION_RENEWAL_DUE',
+    channel: 'IN_APP',
+    subject: 'Renewal due — {{registrationNumber}}',
+    body: '{{registrationNumber}} is due for renewal; it is valid until {{validTo}}.',
+    variables: ['registrationNumber', 'validTo'],
+  },
+  {
+    eventCode: 'DEVELOPER_REGISTRATION_RENEWAL_DUE',
+    channel: 'EMAIL',
+    subject: 'Renewal due — {{registrationNumber}}',
+    body:
+      'Dear {{recipientName}},\n\n' +
+      'Developer registration {{registrationNumber}} is due for renewal; it is valid until {{validTo}}.\n\n' +
+      'Renew it here: {{link}}\n\n' +
+      '{{orgName}}',
+    variables: ['registrationNumber', 'validTo', 'recipientName', 'link', 'orgName'],
+  },
+  {
+    eventCode: 'DEVELOPER_REGISTRATION_RENEWAL_DUE',
+    channel: 'SMS',
+    subject: '',
+    body: 'Registration {{registrationNumber}} is due for renewal by {{validTo}}. - {{orgShortName}}',
+    variables: ['registrationNumber', 'validTo', 'orgShortName'],
+  },
 ];
 
 export async function seedNotifications(prisma: PrismaClient) {

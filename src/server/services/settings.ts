@@ -185,8 +185,8 @@ export const SETTING_GROUPS: Array<{ key: string; title: string; description: st
   },
   {
     key: 'professionals',
-    title: 'Professional registration',
-    description: 'Validity and renewal window for professional registrations. Demonstration values; a registration never outlives the licence itself.',
+    title: 'LTP registration',
+    description: 'Validity and renewal window for LTP registrations. Demonstration values; a registration never outlives the licence itself.',
   },
   {
     key: 'security',

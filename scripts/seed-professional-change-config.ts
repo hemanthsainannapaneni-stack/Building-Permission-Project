@@ -5,7 +5,7 @@
  *
  * For a database seeded before the change of technical professional module
  * existed. Runs the two idempotent core seeds it needs — the permission matrix
- * (adds PROFESSIONAL_CHANGE_* and re-syncs every role to src/lib/rbac-matrix.ts)
+ * (adds LTP_CHANGE_* and re-syncs every role to src/lib/rbac-matrix.ts)
  * and the workflow definitions (adds the five actions and their transitions,
  * then re-validates and re-publishes) — without re-running the whole core
  * seed. The tables themselves are created separately (see the Phase 8 notes).

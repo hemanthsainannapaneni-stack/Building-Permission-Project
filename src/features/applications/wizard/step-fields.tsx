@@ -11,6 +11,7 @@ import type { DataStepKey } from '@/lib/schemas/applications';
 import { WIZARD_REQUIRES_FIELDS_TO_ADVANCE } from '@/lib/application-steps';
 import type { ApplicationMeta } from '../types';
 import { api } from '../api';
+import { DEVELOPER_TYPE_LABEL, type DeveloperType } from '@/lib/developer-registration';
 
 /** The required marker, shown only while Next enforces it — see WIZARD_REQUIRES_FIELDS_TO_ADVANCE. */
 const marked = (required?: boolean) => WIZARD_REQUIRES_FIELDS_TO_ADVANCE && Boolean(required);
@@ -573,6 +574,47 @@ function useRegistered(purpose: 'FILE_HOLDER' | 'STRUCTURAL', mine: boolean) {
 
 const validLabel = (d: string | null) => (d ? ` · valid to ${new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}` : '');
 
+type AvailableDeveloper = {
+  registrationId: string;
+  registrationNumber: string;
+  developerType: string;
+  developerName: string;
+  organization: string;
+  authorizedPerson: string;
+  mobile: string;
+  validTo: string | null;
+};
+
+/** The developer register's approved, in-force entries, shaped for the same picker as the professional register. */
+function useRegisteredDevelopers() {
+  const [rows, setRows] = React.useState<RegisteredProfessional[] | null>(null);
+  React.useEffect(() => {
+    let live = true;
+    api
+      .get<AvailableDeveloper[]>('/api/developers/available')
+      .then(
+        (r) =>
+          live &&
+          setRows(
+            r.map((d) => ({
+              registrationId: d.registrationId,
+              registrationNumber: d.registrationNumber,
+              typeLabel: DEVELOPER_TYPE_LABEL[d.developerType as DeveloperType] ?? d.developerType,
+              name: d.developerName,
+              licenceNo: '',
+              organization: d.organization,
+              validTo: d.validTo,
+            }))
+          )
+      )
+      .catch(() => live && setRows([]));
+    return () => {
+      live = false;
+    };
+  }, []);
+  return rows;
+}
+
 function RegisterSelect({
   form,
   name,
@@ -597,7 +639,7 @@ function RegisterSelect({
         className="h-9 w-full rounded border border-border-strong bg-surface px-2 text-small text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         {...form.register(name)}
       >
-        <option value="">{rows ? none : 'Loading the professional register…'}</option>
+        <option value="">{rows ? none : 'Loading the LTP register…'}</option>
         {rows?.map((r) => (
           <option key={r.registrationId} value={r.registrationId}>
             {r.registrationNumber} — {r.name} ({r.typeLabel}
@@ -612,6 +654,7 @@ function RegisterSelect({
 function LtpFields({ form }: { form: Form }) {
   const own = useRegistered('FILE_HOLDER', true);
   const structural = useRegistered('STRUCTURAL', false);
+  const developers = useRegisteredDevelopers();
   return (
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-2">
@@ -619,7 +662,7 @@ function LtpFields({ form }: { form: Form }) {
           form={form}
           name="professionalRegistrationId"
           label="Filing under registration"
-          hint="Your approved entry in the authority’s professional register."
+          hint="Your approved entry in the authority’s LTP register."
           rows={own}
           none="— Not named —"
         />
@@ -627,8 +670,16 @@ function LtpFields({ form }: { form: Form }) {
           form={form}
           name="structuralEngineerRegistrationId"
           label="Structural engineer"
-          hint="From the professional register — approved and in force. Leave blank where no structural certificate is called for."
+          hint="From the LTP register — approved and in force. Leave blank where no structural certificate is called for."
           rows={structural}
+          none="— None on this file —"
+        />
+        <RegisterSelect
+          form={form}
+          name="developerRegistrationId"
+          label="Developer"
+          hint="From the developer register — approved and in force. Leave blank where the owner is building for themselves."
+          rows={developers}
           none="— None on this file —"
         />
       </div>

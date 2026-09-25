@@ -16,7 +16,7 @@ const TABS = [
   { label: 'Document Types', href: '/admin/settings/document-types', icon: FileText },
   { label: 'Checklists', href: '/admin/settings/checklists', icon: ListChecks },
   { label: 'NOC Types', href: '/admin/settings/noc-types', icon: FileText },
-  { label: 'Professional Types', href: '/admin/settings/professional-types', icon: FileText },
+  { label: 'LTP Types', href: '/admin/settings/ltp-types', icon: FileText },
   { label: 'System', href: '/admin/settings/system', icon: SlidersHorizontal },
   { label: 'Notifications', href: '/admin/settings/notifications', icon: MessageSquare },
   { label: 'Delivery Logs', href: '/admin/settings/sms-logs', icon: MessageSquare },

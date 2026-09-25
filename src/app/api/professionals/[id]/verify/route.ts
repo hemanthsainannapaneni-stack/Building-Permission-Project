@@ -8,5 +8,5 @@ export const dynamic = 'force-dynamic';
 /** Verifies the registration, recommending approval or rejection: IN_PROCESS → VERIFIED. */
 export const POST = defineRoute(
   async ({ user, params, body, ip, userAgent, correlationId }) => verifyProfessionalRegistration(user, params.id, body, { ip, userAgent, correlationId }),
-  { capabilities: [CAPABILITIES.PROFESSIONAL_REG_VERIFY], schema: professionalVerifySchema }
+  { capabilities: [CAPABILITIES.LTP_REG_VERIFY], schema: professionalVerifySchema }
 );

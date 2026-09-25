@@ -17,5 +17,5 @@ export const POST = defineRoute(
     }
     return respondProfessionalShortfall(user, params.id, { ...parsed.data, uploads }, { ip, userAgent, correlationId });
   },
-  { capabilities: [CAPABILITIES.PROFESSIONAL_REG_REGISTER], rateLimit: 'upload' }
+  { capabilities: [CAPABILITIES.LTP_REG_REGISTER], rateLimit: 'upload' }
 );

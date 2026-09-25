@@ -21,5 +21,5 @@ export const POST = defineRoute(
     }
     return addProfessionalChangeDocuments(user, params.id, { ...parsed.data, uploads }, { ip, userAgent, correlationId });
   },
-  { capabilities: [CAPABILITIES.PROFESSIONAL_CHANGE_REQUEST, CAPABILITIES.PROFESSIONAL_CHANGE_VERIFY], rateLimit: 'upload' }
+  { capabilities: [CAPABILITIES.LTP_CHANGE_REQUEST, CAPABILITIES.LTP_CHANGE_VERIFY], rateLimit: 'upload' }
 );

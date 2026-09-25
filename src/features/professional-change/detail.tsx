@@ -45,7 +45,7 @@ const EVENT_LABEL: Record<string, string> = {
   REVIEWED: 'Reviewed',
   APPROVED: 'Approved',
   REJECTED: 'Rejected',
-  PROFESSIONAL_CHANGED: 'Professional changed · drawing rights transferred',
+  PROFESSIONAL_CHANGED: 'LTP changed · drawing rights transferred',
 };
 const statusLabel = (s: string) => PROFESSIONAL_CHANGE_STATUS_LABEL[s as ProfessionalChangeStatus] ?? s;
 
@@ -71,10 +71,10 @@ export function ProfessionalChangeDetailView({ initial }: { initial: Professiona
         <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2 space-y-0">
           <div>
             <CardTitle className="flex flex-wrap items-center gap-2">
-              Change of technical professional <StatusBadge kind="professionalChange" status={req.status} />
+              Change of LTP <StatusBadge kind="professionalChange" status={req.status} />
             </CardTitle>
             <CardDescription>
-              <Link href={`/applications/${req.application.id}?tab=professional`} className="text-primary hover:underline">
+              <Link href={`/applications/${req.application.id}?tab=ltp`} className="text-primary hover:underline">
                 {req.application.applicationNumber}
               </Link>{' '}
               · File at {req.application.fileDesk} · <StatusBadge status={req.application.status} />
@@ -257,7 +257,7 @@ function DecideDialog({ req, onClose, onDone }: { req: ProfessionalChangeDetail;
       toast.success(
         decision === 'APPROVED'
           ? `${req.proposedSnapshot.name} now holds the file and its drawing rights.`
-          : 'Request rejected. The current professional continues.'
+          : 'Request rejected. The current LTP continues.'
       );
       await onDone();
     } catch (error) {
@@ -272,8 +272,8 @@ function DecideDialog({ req, onClose, onDone }: { req: ProfessionalChangeDetail;
         <DialogHeader>
           <DialogTitle>Decide {req.requestNumber}</DialogTitle>
           <DialogDescription>
-            Approving makes {req.proposedSnapshot.name} the file’s technical professional and moves drawing submission rights to them.{' '}
-            {req.currentSnapshot.name} stays in the file’s professional history.
+            Approving makes {req.proposedSnapshot.name} the file’s LTP and moves drawing submission rights to them.{' '}
+            {req.currentSnapshot.name} stays in the file’s LTP history.
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="space-y-3">
@@ -380,7 +380,7 @@ function AddDocumentsDialog({ req, onClose, onDone }: { req: ProfessionalChangeD
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Add documents to {req.requestNumber}</DialogTitle>
-          <DialogDescription>Documents that arrived after the request — the outgoing professional’s NOC, for instance. The request stays where it is.</DialogDescription>
+          <DialogDescription>Documents that arrived after the request — the outgoing LTP’s NOC, for instance. The request stays where it is.</DialogDescription>
         </DialogHeader>
         <DialogBody>
           <DocumentInputs files={files} setFiles={setFiles} demoAllowed={req.permissions.demoDocumentAllowed} demo={demo} setDemo={setDemo} demoLabel="Demo placeholder" />

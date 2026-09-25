@@ -432,7 +432,7 @@ export async function notifyWorkCommencement(
   // writes to storage. The engine asks the same questions again, in its
   // transaction, and is the one that decides.
   const roleKey = await actingRole(user);
-  if (!roleKey) throw forbidden('Commencement of work is notified by the file’s technical professional.');
+  if (!roleKey) throw forbidden('Commencement of work is notified by the file’s LTP.');
   const blocker = blockerOf(app);
   if (blocker) throw conflict(blocker);
   const wf = await workflowAllows(app);

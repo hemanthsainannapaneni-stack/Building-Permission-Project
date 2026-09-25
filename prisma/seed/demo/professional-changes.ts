@@ -45,7 +45,7 @@ const PLAN: Array<{ target: Target; stages: string[]; reason: string; documents:
     target: 'PENDING',
     stages: ['TPA_REVIEW', 'LTP_SHORTFALL_ACTION', 'TPA_SITE_INSPECTION'],
     reason:
-      'The owner writes that the architect has relocated to another city and can no longer attend site inspections or answer the department; the owner wishes to engage a local professional.',
+      'The owner writes that the architect has relocated to another city and can no longer attend site inspections or answer the department; the owner wishes to engage a local LTP.',
     // Registered without the outgoing professional's release: verification is
     // blocked until the NOC or a termination letter is added.
     documents: ['OWNER_REQUEST_LETTER', 'NEW_PROFESSIONAL_CONSENT', 'INDEMNITY'],
@@ -62,7 +62,7 @@ const PLAN: Array<{ target: Target; stages: string[]; reason: string; documents:
     target: 'APPROVED',
     stages: ['CLOSED_APPROVED', 'ZJD_REVIEW'],
     reason:
-      'Construction is about to begin. The owner wishes the supervising professional to be a firm with structural engineering capacity, and the present architect has agreed to hand over.',
+      'Construction is about to begin. The owner wishes the supervising LTP to be a firm with structural engineering capacity, and the present architect has agreed to hand over.',
     documents: [
       'OWNER_REQUEST_LETTER',
       'CURRENT_PROFESSIONAL_NOC',
@@ -76,7 +76,7 @@ const PLAN: Array<{ target: Target; stages: string[]; reason: string; documents:
   {
     target: 'REJECTED',
     stages: ['ZJD_REVIEW', 'ZDD_REVIEW', 'PLANNING_OFFICER_REVIEW'],
-    reason: 'The owner has terminated the architect’s engagement and asks that the proposed professional be recorded in their place.',
+    reason: 'The owner has terminated the architect’s engagement and asks that the proposed LTP be recorded in their place.',
     documents: ['OWNER_REQUEST_LETTER', 'TERMINATION_LETTER', 'NEW_PROFESSIONAL_CONSENT'],
   },
 ];
@@ -123,7 +123,7 @@ export async function seedProfessionalChanges(prisma: PrismaClient, options: { a
 
   const existing = await prisma.professionalChangeRequest.count();
   if (existing) {
-    log(`${existing} change of professional request(s) already exist — nothing created.`);
+    log(`${existing} change of LTP request(s) already exist — nothing created.`);
     return { applied: false };
   }
 
@@ -190,7 +190,7 @@ export async function seedProfessionalChanges(prisma: PrismaClient, options: { a
     );
     const req = await prisma.professionalChangeRequest.findFirstOrThrow({ where: { applicationId: app.id }, orderBy: { requestedAt: 'desc' } });
     if (plan.target === 'PENDING') {
-      log(`  ${app.applicationNumber}: ${req.requestNumber} pending verification (no release from the outgoing professional yet)`);
+      log(`  ${app.applicationNumber}: ${req.requestNumber} pending verification (no release from the outgoing LTP yet)`);
       continue;
     }
 
@@ -200,7 +200,7 @@ export async function seedProfessionalChanges(prisma: PrismaClient, options: { a
     await verifyProfessionalChange(
       po,
       req.id,
-      { remarks: 'Owner’s letter, the outgoing professional’s release and the incoming professional’s consent are on record and consistent.' },
+      { remarks: 'Owner’s letter, the outgoing LTP’s release and the incoming LTP’s consent are on record and consistent.' },
       META
     );
     if (plan.target === 'UNDER_REVIEW') {
@@ -214,7 +214,7 @@ export async function seedProfessionalChanges(prisma: PrismaClient, options: { a
       {
         remarks:
           plan.target === 'APPROVED'
-            ? 'The incoming professional’s licence is in force and covers this class of building. Recommended for approval.'
+            ? 'The incoming LTP’s licence is in force and covers this class of building. Recommended for approval.'
             : 'There is no NOC from the outgoing architect, whose fee claim is recorded as unsettled. Not recommended until it is.',
       },
       META
@@ -223,7 +223,7 @@ export async function seedProfessionalChanges(prisma: PrismaClient, options: { a
       zjd,
       req.id,
       plan.target === 'APPROVED'
-        ? { decision: 'APPROVED', remarks: 'Approved. The incoming professional takes over the file and its drawing submissions from today.' }
+        ? { decision: 'APPROVED', remarks: 'Approved. The incoming LTP takes over the file and its drawing submissions from today.' }
         : { decision: 'REJECTED', remarks: 'Rejected. The owner may apply again with the outgoing architect’s NOC or evidence that the fee dispute is settled.' },
       META
     );

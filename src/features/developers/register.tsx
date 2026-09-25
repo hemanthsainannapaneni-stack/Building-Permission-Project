@@ -12,6 +12,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   DEVELOPER_REGISTER_LABEL,
+  DEVELOPER_STATUSES,
+  DEVELOPER_STATUS_LABEL,
   DEVELOPER_TYPES,
   DEVELOPER_TYPE_LABEL,
   type DeveloperRegister,
@@ -20,13 +22,14 @@ import {
 import { fmtShort, selectClass, useRegister } from '@/features/proceedings/shared';
 import type { DeveloperRow, Paged } from './types';
 
-export type DeveloperFilters = { q: string; register: string; type: string };
-export const EMPTY_DEVELOPER_FILTERS: DeveloperFilters = { q: '', register: 'ALL', type: '' };
+export type DeveloperFilters = { q: string; register: string; type: string; status: string; dateFrom: string; dateTo: string };
+export const EMPTY_DEVELOPER_FILTERS: DeveloperFilters = { q: '', register: 'ALL', type: '', status: '', dateFrom: '', dateTo: '' };
 
 /** One of the developer registers — the tab chosen on the page — with search and a type filter. */
 export function DeveloperRegisterTable({ initial, initialFilters = EMPTY_DEVELOPER_FILTERS }: { initial: Paged<DeveloperRow>; initialFilters?: DeveloperFilters }) {
   const r = useRegister<DeveloperRow, DeveloperFilters>('/api/developers', initial, initialFilters);
   const register = r.filters.register as DeveloperRegister;
+  const filtered = Boolean(r.filters.q || r.filters.type || r.filters.status || r.filters.dateFrom || r.filters.dateTo);
 
   const columns = React.useMemo<ColumnDef<DeveloperRow, unknown>[]>(
     () => [
@@ -108,7 +111,23 @@ export function DeveloperRegisterTable({ initial, initialFilters = EMPTY_DEVELOP
             </option>
           ))}
         </select>
-        {(r.filters.q || r.filters.type) && (
+        {register === 'ALL' && (
+          <select aria-label="Status" className={selectClass} value={r.filters.status} onChange={(e) => r.update({ status: e.target.value })}>
+            <option value="">All statuses</option>
+            {DEVELOPER_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {DEVELOPER_STATUS_LABEL[s]}
+              </option>
+            ))}
+          </select>
+        )}
+        <label className="flex items-center gap-1.5 text-small text-text-muted">
+          Submitted
+          <Input aria-label="Submitted from" type="date" className="w-36" value={r.filters.dateFrom} onChange={(e) => r.update({ dateFrom: e.target.value })} />
+          <span>to</span>
+          <Input aria-label="Submitted to" type="date" className="w-36" value={r.filters.dateTo} onChange={(e) => r.update({ dateTo: e.target.value })} />
+        </label>
+        {filtered && (
           <Button variant="ghost" size="sm" onClick={r.reset}>
             <RotateCcw /> Reset
           </Button>
@@ -121,8 +140,8 @@ export function DeveloperRegisterTable({ initial, initialFilters = EMPTY_DEVELOP
         columns={columns}
         data={r.data.rows}
         loading={r.loading}
-        emptyTitle={r.filters.q || r.filters.type ? 'Nothing matches those filters' : `Nothing in ${DEVELOPER_REGISTER_LABEL[register] ?? 'this register'}`}
-        emptyDescription={r.filters.q || r.filters.type ? 'Try widening the filters.' : 'Registrations appear here as they reach this stage.'}
+        emptyTitle={filtered ? 'Nothing matches those filters' : `Nothing in ${DEVELOPER_REGISTER_LABEL[register] ?? 'this register'}`}
+        emptyDescription={filtered ? 'Try widening the filters.' : 'Registrations appear here as they reach this stage.'}
       />
       <Pagination page={r.data.page} pageSize={r.data.pageSize} total={r.data.total} totalPages={r.data.totalPages} onPageChange={r.setPage} disabled={r.loading} noun="registration" />
     </div>

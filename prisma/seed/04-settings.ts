@@ -294,7 +294,7 @@ export const SETTINGS: Seed[] = [
     group: 'notifications',
     label: 'Message the applicant as well as the LTP',
     description:
-      'The LTP holds the account and does the work; the applicant is the citizen whose building it is. With this on, both are told when a decision or a shortfall affects the application. Turn it off for a department that corresponds only with the professional.',
+      'The LTP holds the account and does the work; the applicant is the citizen whose building it is. With this on, both are told when a decision or a shortfall affects the application. Turn it off for a department that corresponds only with the LTP.',
   },
   {
     key: 'notifications_quiet_hours',
@@ -332,7 +332,7 @@ export const SETTINGS: Seed[] = [
     group: 'professionals',
     label: 'Registration validity (years)',
     description:
-      'DEMO VALUE. How long an approved professional registration runs — never past the licence’s own validity. Issued registrations keep their dates.',
+      'DEMO VALUE. How long an approved LTP registration runs — never past the licence’s own validity. Issued registrations keep their dates.',
   },
   {
     key: 'professional_renewal_window_days',

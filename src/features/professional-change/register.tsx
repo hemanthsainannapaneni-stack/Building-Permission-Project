@@ -42,7 +42,7 @@ export function ProfessionalChangeRegister({
         id: 'number',
         header: 'Request Number',
         cell: ({ row }) => (
-          <Link href={`/professional-changes/${row.original.id}`} className="whitespace-nowrap font-medium text-primary hover:underline">
+          <Link href={`/ltp-changes/${row.original.id}`} className="whitespace-nowrap font-medium text-primary hover:underline">
             {row.original.requestNumber}
           </Link>
         ),
@@ -52,7 +52,7 @@ export function ProfessionalChangeRegister({
         header: 'Application',
         cell: ({ row }) => (
           <Link
-            href={`/applications/${row.original.application.id}?tab=professional`}
+            href={`/applications/${row.original.application.id}?tab=ltp`}
             className="whitespace-nowrap text-text hover:underline"
           >
             {row.original.application.applicationNumber}
@@ -64,10 +64,10 @@ export function ProfessionalChangeRegister({
         header: 'Owner',
         cell: ({ row }) => <span className="block max-w-[11rem] truncate text-small">{row.original.owner || '—'}</span>,
       },
-      { id: 'current', header: 'Current Professional', cell: ({ row }) => <Professional p={row.original.currentProfessional} /> },
+      { id: 'current', header: 'Current LTP', cell: ({ row }) => <Professional p={row.original.currentProfessional} /> },
       {
         id: 'proposed',
-        header: 'Proposed Professional',
+        header: 'Proposed LTP',
         cell: ({ row }) => (
           <span className="flex items-center gap-1.5">
             <ArrowRight className="size-3.5 shrink-0 text-text-muted" aria-hidden />
@@ -94,8 +94,8 @@ export function ProfessionalChangeRegister({
     <div className="space-y-3.5">
       <div className="flex flex-wrap items-end gap-2">
         <Input
-          aria-label="Search by request number, application, owner or professional"
-          placeholder="Search request, application, owner, professional…"
+          aria-label="Search by request number, application, owner or LTP"
+          placeholder="Search request, application, owner, LTP…"
           className="w-72"
           value={r.search}
           onChange={(e) => r.setSearch(e.target.value)}
@@ -122,9 +122,9 @@ export function ProfessionalChangeRegister({
         columns={columns}
         data={r.data.rows}
         loading={r.loading}
-        emptyTitle={r.active ? 'Nothing matches those filters' : 'No change of professional requests'}
+        emptyTitle={r.active ? 'Nothing matches those filters' : 'No change of LTP requests'}
         emptyDescription={
-          r.active ? 'Try widening the filters.' : 'A request is registered from an application’s Technical Professional tab, on receipt of the owner’s letter.'
+          r.active ? 'Try widening the filters.' : 'A request is registered from an application’s LTP tab, on receipt of the owner’s letter.'
         }
       />
       <Pagination

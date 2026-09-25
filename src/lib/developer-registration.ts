@@ -397,3 +397,13 @@ export const DEVELOPER_REGISTER_HINT: Record<DeveloperRegister, string> = {
 };
 
 export const isDeveloperRegister = (v: string): v is DeveloperRegister => (DEVELOPER_REGISTERS as readonly string[]).includes(v);
+
+// ── Application integration ─────────────────────────────────────────────────
+
+/**
+ * Whether a building-permission application may name this developer today —
+ * approved, current (not superseded by a later registration) and not lapsed.
+ * The same test occupancy and professional registration use for "available".
+ */
+export const isDeveloperAvailable = (r: { status: string; isCurrent: boolean; validTo: Date | string | null }, now: Date) =>
+  r.status === 'APPROVED' && r.isCurrent && Boolean(r.validTo) && !isLapsed(r.validTo, now);

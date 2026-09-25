@@ -135,7 +135,7 @@ export function ProfessionalForm({ existing, types, demoAllowed }: { existing?: 
       if (existing) form.set('expectedStatus', existing.status);
       const res = await postForm<{ id: string; applicationNumber: string }>(existing ? `/api/professionals/${existing.id}` : '/api/professionals', form);
       toast.success(existing ? 'Draft saved' : `Draft ${res.applicationNumber} opened`);
-      router.push(`/professionals/${res.id}`);
+      router.push(`/ltp/${res.id}`);
       router.refresh();
     } catch (error) {
       setErrors(reportError(error));
@@ -149,11 +149,11 @@ export function ProfessionalForm({ existing, types, demoAllowed }: { existing?: 
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>Professional</CardTitle>
+          <CardTitle>LTP particulars</CardTitle>
           <CardDescription>As the application received at the office states it.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="Professional type" htmlFor="pr-type" required error={err('professionalType')} hint="Types are configured on Settings → Professional Types.">
+          <Field label="LTP type" htmlFor="pr-type" required error={err('professionalType')} hint="Types are configured on Settings → LTP Types.">
             <select id="pr-type" className={`${selectClass} w-full`} value={v.professionalType} onChange={(e) => chooseType(e.target.value)}>
               {active.map((t) => (
                 <option key={t.code} value={t.code}>
@@ -169,7 +169,7 @@ export function ProfessionalForm({ existing, types, demoAllowed }: { existing?: 
             label="Portal account"
             htmlFor="pr-account"
             error={err('userId')}
-            hint={type?.canHoldFile ? 'Link the account the professional already signs in with. Required for them to file or take over applications.' : `A ${type?.label.toLowerCase() ?? 'professional'} does not hold files; no account is linked.`}
+            hint={type?.canHoldFile ? 'Link the account the LTP already signs in with. Required for them to file or take over applications.' : `${type ? `A ${type.label.toLowerCase()}` : 'This type'} does not hold files; no account is linked.`}
           >
             <select id="pr-account" className={`${selectClass} w-full`} value={v.userId} onChange={(e) => chooseAccount(e.target.value)} disabled={!type?.canHoldFile || !accounts}>
               <option value="">{accounts ? '— No portal account —' : 'Loading accounts…'}</option>
@@ -273,7 +273,7 @@ export function ProfessionalForm({ existing, types, demoAllowed }: { existing?: 
         <CardContent>
           <CheckboxField
             id="pr-consent"
-            label="The professional gives this consent"
+            label="The LTP gives this consent"
             description={CONSENT_TEXT}
             checked={v.consentGiven}
             error={err('consentGiven')}

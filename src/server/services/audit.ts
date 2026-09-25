@@ -183,6 +183,35 @@ export async function applicationAudit(applicationId: string, limit = 200) {
  * history — it makes rewriting it *undetectably* substantially harder, which
  * is the realistic goal.
  */
+/**
+ * The raw audit_logs rows for one entity — a developer registration, a
+ * professional registration, or any other row identified by (entityType,
+ * entityId) rather than an applicationId. Same shape as `applicationAudit`,
+ * the same table, the same hash chain; only the WHERE clause differs.
+ */
+export async function entityAudit(entityType: string, entityId: string, limit = 200) {
+  return prisma.auditLog.findMany({
+    where: { entityType, entityId },
+    orderBy: { seq: 'desc' },
+    take: limit,
+    select: {
+      id: true,
+      seq: true,
+      action: true,
+      entityType: true,
+      entityId: true,
+      actorName: true,
+      actorRoleKey: true,
+      before: true,
+      after: true,
+      remarks: true,
+      ip: true,
+      correlationId: true,
+      occurredAt: true,
+    },
+  });
+}
+
 export type ChainVerification = { checked: number; from: number } & (
   | { ok: true }
   | { ok: false; brokenAtId: string; brokenAtSeq: number }

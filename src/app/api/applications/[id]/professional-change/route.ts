@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 /** The file's professional history and change requests — the Technical Professional tab. */
 export const GET = defineRoute(async ({ user, params }) => getApplicationProfessional(user, params.id), {
-  capabilities: [CAPABILITIES.PROFESSIONAL_CHANGE_VIEW],
+  capabilities: [CAPABILITIES.LTP_CHANGE_VIEW],
 });
 
 /**
@@ -35,5 +35,5 @@ export const POST = defineRoute(
     }
     return requestProfessionalChange(user, params.id, { ...parsed.data, uploads }, { ip, userAgent, correlationId });
   },
-  { capabilities: [CAPABILITIES.PROFESSIONAL_CHANGE_REQUEST], rateLimit: 'upload' }
+  { capabilities: [CAPABILITIES.LTP_CHANGE_REQUEST], rateLimit: 'upload' }
 );

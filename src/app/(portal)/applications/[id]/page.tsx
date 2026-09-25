@@ -196,7 +196,7 @@ export default async function ApplicationPage({ params }: { params: Promise<{ id
     can(user, CAPABILITIES.SITE_INSPECTION_VIEW) ? getApplicationInspections(user, id) : null,
     can(user, CAPABILITIES.NOC_VIEW) ? getApplicationNocs(user, id) : null,
     can(user, CAPABILITIES.SHOW_CAUSE_VIEW) ? getApplicationProceedings(user, id) : null,
-    can(user, CAPABILITIES.PROFESSIONAL_CHANGE_VIEW) ? getApplicationProfessional(user, id) : null,
+    can(user, CAPABILITIES.LTP_CHANGE_VIEW) ? getApplicationProfessional(user, id) : null,
     // Post approval only: before approval the tab has nothing to show.
     can(user, CAPABILITIES.COMMENCEMENT_VIEW) && ['APPROVED', 'PROCEEDING_REVOKED'].includes(application.status)
       ? getApplicationCommencement(user, id)

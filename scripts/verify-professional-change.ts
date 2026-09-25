@@ -112,7 +112,7 @@ async function main() {
     orderBy: { requestNumber: 'asc' },
     include: { application: { select: { id: true, applicationNumber: true, ltpUserId: true, ltpDeclaration: true, zoneId: true, status: true, currentStageCode: true } } },
   });
-  console.log(`\n${requests.length} change of professional request(s)\n`);
+  console.log(`\n${requests.length} change of LTP request(s)\n`);
   check('demo has one request in each state', ['PENDING_VERIFICATION', 'UNDER_REVIEW', 'APPROVED', 'REJECTED'].every((s) => requests.some((r) => r.status === s)),
     requests.map((r) => r.status).join(', '));
 
@@ -156,31 +156,31 @@ async function main() {
 
     if (r.status === 'APPROVED') {
       // ── New professional becomes active ─────────────────────────────
-      check('file now held by the proposed professional', app.ltpUserId === r.proposedProfessionalId);
+      check('file now held by the proposed LTP', app.ltpUserId === r.proposedProfessionalId);
       const active = engagements.filter((e) => e.status === 'ACTIVE');
-      check('exactly one ACTIVE engagement, for the new professional', active.length === 1 && active[0]!.userId === r.proposedProfessionalId);
+      check('exactly one ACTIVE engagement, for the new LTP', active.length === 1 && active[0]!.userId === r.proposedProfessionalId);
       check('new engagement holds drawing rights and names the request', Boolean(active[0]?.drawingRights) && active[0]?.changeRequestId === r.id);
 
       // ── Old professional history remains ────────────────────────────
       const old = engagements.find((e) => e.userId === r.currentProfessionalId);
-      check('old professional kept in history', Boolean(old));
+      check('old LTP kept in history', Boolean(old));
       check('old engagement SUPERSEDED, dated, without drawing rights',
         old?.status === 'SUPERSEDED' && Boolean(old.engagedUntil) && old.drawingRights === false && old.endedByChangeRequestId === r.id);
-      check('request still names the old professional', cur.userId === r.currentProfessionalId && Boolean(cur.name));
+      check('request still names the old LTP', cur.userId === r.currentProfessionalId && Boolean(cur.name));
       const decl = (app.ltpDeclaration ?? {}) as { name?: string };
-      check('filing declaration untouched (not rewritten to the new professional)', !decl.name || decl.name !== prop.name, decl.name ?? '(none)');
+      check('filing declaration untouched (not rewritten to the new LTP)', !decl.name || decl.name !== prop.name, decl.name ?? '(none)');
       const events = await prisma.professionalChangeEvent.findMany({ where: { requestId: r.id }, select: { action: true } });
-      check('request history shows Professional Changed', events.some((e) => e.action === 'PROFESSIONAL_CHANGED'));
+      check('request history shows LTP Changed', events.some((e) => e.action === 'PROFESSIONAL_CHANGED'));
 
       // ── Drawing rights, through the drawings service's own scope ────
       const oldLtp = await actorFor(r.currentProfessionalId);
       const newLtp = await actorFor(r.proposedProfessionalId);
       const oldSees = await refused(() => listDrawings(oldLtp, app.id));
       const newSees = await refused(() => listDrawings(newLtp, app.id));
-      check('old professional can no longer reach the drawings', Boolean(oldSees), oldSees || 'was allowed');
-      check('new professional can reach the drawings', !newSees, newSees);
+      check('old LTP can no longer reach the drawings', Boolean(oldSees), oldSees || 'was allowed');
+      check('new LTP can reach the drawings', !newSees, newSees);
     } else {
-      check('file still held by the current professional', app.ltpUserId === r.currentProfessionalId);
+      check('file still held by the current LTP', app.ltpUserId === r.currentProfessionalId);
       check('no engagement row points at this undecided/rejected request', !engagements.some((e) => e.changeRequestId === r.id || e.endedByChangeRequestId === r.id));
     }
 
@@ -190,7 +190,7 @@ async function main() {
       const hasRelease = (r.documents as Array<{ kind: string }>).some((d) => d.kind === 'CURRENT_PROFESSIONAL_NOC' || d.kind === 'TERMINATION_LETTER');
       if (po && !hasRelease) {
         const msg = await refused(() => verifyProfessionalChange(po, r.id, { remarks: 'Attempted by the verification script.' }, META));
-        check('verification refused without the outgoing professional’s NOC or termination letter', /NOC|termination/i.test(msg), msg);
+        check('verification refused without the outgoing LTP’s NOC or termination letter', /NOC|termination/i.test(msg), msg);
       }
       const ltp = await actorFor(app.ltpUserId);
       const msg2 = await refused(() => verifyProfessionalChange(ltp, r.id, { remarks: 'Attempted by the verification script.' }, META));
@@ -211,7 +211,7 @@ async function main() {
   const rows = await prisma.workflowTransition.count({
     where: { isActive: true, workflow: { code: 'BBAS_STANDARD', isPublished: true }, action: { code: { contains: 'PROFESSIONAL_CHANGE' } } },
   });
-  check('BBAS_STANDARD carries the change of professional transitions', rows >= 35, `${rows} rows`);
+  check('BBAS_STANDARD carries the change of LTP transitions', rows >= 35, `${rows} rows`);
 
   console.log(`\n${passed} passed, ${failures.length} failed`);
   if (failures.length) {

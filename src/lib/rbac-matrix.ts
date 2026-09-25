@@ -67,7 +67,7 @@ const OFFICER_BASE: Capability[] = [
   // Every desk reads the change of professional register. Each STEP is
   // granted to one desk below: TPA registers, Planning Officer verifies, ZDD
   // reviews, ZJD decides — the BBAS chain's own order.
-  C.PROFESSIONAL_CHANGE_VIEW,
+  C.LTP_CHANGE_VIEW,
   // Every desk reads the Work Initiated register. None gives the notice.
   C.COMMENCEMENT_VIEW,
   // Every desk reads the occupancy register. Each step is granted to one desk
@@ -79,7 +79,7 @@ const OFFICER_BASE: Capability[] = [
   C.DEVELOPER_VIEW,
   // The professional register, on the same chain: TPA registers, Planning
   // Officer verifies, ZJD decides — granted below.
-  C.PROFESSIONAL_REG_VIEW,
+  C.LTP_REG_VIEW,
   C.ORDER_VIEW,
   C.AUDIT_VIEW,
   C.REPORT_VIEW,
@@ -104,11 +104,11 @@ const READ_ONLY: Capability[] = [
   C.SHOW_CAUSE_VIEW,
   C.REVOCATION_VIEW,
   C.OUTWARD_VIEW,
-  C.PROFESSIONAL_CHANGE_VIEW,
+  C.LTP_CHANGE_VIEW,
   C.COMMENCEMENT_VIEW,
   C.OCCUPANCY_VIEW,
   C.DEVELOPER_VIEW,
-  C.PROFESSIONAL_REG_VIEW,
+  C.LTP_REG_VIEW,
   C.ORDER_VIEW,
   C.AUDIT_VIEW,
   C.REPORT_VIEW,
@@ -153,7 +153,7 @@ export const RBAC_MATRIX: Record<RoleKey, Capability[]> = {
     C.REVOCATION_VIEW,
     // Sees change of professional requests on files it holds. Never takes a
     // step: the owner asks and the department decides.
-    C.PROFESSIONAL_CHANGE_VIEW,
+    C.LTP_CHANGE_VIEW,
     // Notifies the commencement of work on an approved file whose order is
     // issued — on the owner's behalf, as it files and answers on their behalf.
     C.COMMENCEMENT_VIEW,
@@ -183,7 +183,7 @@ export const RBAC_MATRIX: Record<RoleKey, Capability[]> = {
     C.NOC_VERIFY,
     // Registers the owner's request to change the technical professional —
     // the first desk, where the owner's letter arrives.
-    C.PROFESSIONAL_CHANGE_REQUEST,
+    C.LTP_CHANGE_REQUEST,
     // Books and records the final inspection, as it does the pre-approval
     // site inspection.
     C.OCCUPANCY_INSPECT,
@@ -192,7 +192,7 @@ export const RBAC_MATRIX: Record<RoleKey, Capability[]> = {
     // inward desk, as for the owner's change of professional letter.
     C.DEVELOPER_REGISTER,
     // Keys in a professional's registration application, as for developers.
-    C.PROFESSIONAL_REG_REGISTER,
+    C.LTP_REG_REGISTER,
   ],
 
   // ── Zonal Assistant / Deputy Director ─────────────────────────────────
@@ -208,7 +208,7 @@ export const RBAC_MATRIX: Record<RoleKey, Capability[]> = {
   // technical checking this desk does on the file itself.
   //
   // Verifies a developer's registration documents on the same footing.
-  [ROLES.PLANNING_OFFICER]: [...OFFICER_BASE, C.ANALYTICS_VIEW, C.PROFESSIONAL_CHANGE_VERIFY, C.DEVELOPER_VERIFY, C.PROFESSIONAL_REG_VERIFY],
+  [ROLES.PLANNING_OFFICER]: [...OFFICER_BASE, C.ANALYTICS_VIEW, C.LTP_CHANGE_VERIFY, C.DEVELOPER_VERIFY, C.LTP_REG_VERIFY],
 
   // NOC_VERIFY for ZAD as well as ZDD: the legacy chain's ZAD_ZDD_REVIEW desk
   // is shared, and the two are granted identically by design.
@@ -230,7 +230,7 @@ export const RBAC_MATRIX: Record<RoleKey, Capability[]> = {
     C.SHOW_CAUSE_ISSUE,
     C.SHOW_CAUSE_DECIDE,
     // Reviews a verified change of professional request and sends it up.
-    C.PROFESSIONAL_CHANGE_REVIEW,
+    C.LTP_CHANGE_REVIEW,
     // Reviews the as-built building against the approved plan and recommends,
     // or raises an occupancy shortfall.
     C.OCCUPANCY_REVIEW,
@@ -272,7 +272,7 @@ export const RBAC_MATRIX: Record<RoleKey, Capability[]> = {
     C.OUTWARD_MANAGE,
     // Approves or rejects a change of technical professional — the apex desk
     // of the chain decides who holds the file, as it decides the file.
-    C.PROFESSIONAL_CHANGE_DECIDE,
+    C.LTP_CHANGE_DECIDE,
     // Approves or rejects occupancy and issues the certificate — the desk that
     // granted the permission certifies the building built under it.
     C.OCCUPANCY_DECIDE,
@@ -280,7 +280,7 @@ export const RBAC_MATRIX: Record<RoleKey, Capability[]> = {
     // every other registration-like decision in this chain.
     C.DEVELOPER_DECIDE,
     // Approves or rejects a professional's registration.
-    C.PROFESSIONAL_REG_DECIDE,
+    C.LTP_REG_DECIDE,
   ],
 
   // ── Director (Development Plan): city-wide remit ──────────────────────
@@ -373,13 +373,13 @@ export const RBAC_MATRIX: Record<RoleKey, Capability[]> = {
     C.REVOCATION_VIEW,
     C.OUTWARD_VIEW,
     C.OUTWARD_MANAGE,
-    C.PROFESSIONAL_CHANGE_VIEW,
+    C.LTP_CHANGE_VIEW,
     C.COMMENCEMENT_VIEW,
     C.OCCUPANCY_VIEW,
     // Reads the developer register and configures its validity settings;
     // never registers, verifies or decides.
     C.DEVELOPER_VIEW,
-    C.PROFESSIONAL_REG_VIEW,
+    C.LTP_REG_VIEW,
     C.ORDER_VIEW,
     C.USER_MANAGE,
     C.ROLE_MANAGE,

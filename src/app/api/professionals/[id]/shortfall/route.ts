@@ -8,5 +8,5 @@ export const dynamic = 'force-dynamic';
 /** Raises a shortfall: IN_PROCESS → SHORTFALL. */
 export const POST = defineRoute(
   async ({ user, params, body, ip, userAgent, correlationId }) => raiseProfessionalShortfall(user, params.id, body, { ip, userAgent, correlationId }),
-  { capabilities: [CAPABILITIES.PROFESSIONAL_REG_VERIFY], schema: professionalShortfallSchema }
+  { capabilities: [CAPABILITIES.LTP_REG_VERIFY], schema: professionalShortfallSchema }
 );

@@ -105,7 +105,7 @@ async function verifyAllDocuments(po: Awaited<ReturnType<typeof desk>>, id: stri
   }
 }
 
-describe.skipIf(!dbUp)('professional registration', () => {
+describe.skipIf(!dbUp)('LTP registration', () => {
   let tpa: Awaited<ReturnType<typeof desk>>;
   let po: Awaited<ReturnType<typeof desk>>;
   let zjd: Awaited<ReturnType<typeof desk>>;
@@ -206,7 +206,7 @@ describe.skipIf(!dbUp)('professional registration', () => {
     expect((await listProfessionalRegistrations(viewer, { register: 'VERIFIED', pageSize: 100 })).rows.some((r) => r.id === se.id)).toBe(true);
   });
 
-  it('approves: a type-prefixed number, validity from the settings, a letter in Outward — and the professional becomes available', async () => {
+  it('approves: a type-prefixed number, validity from the settings, a letter in Outward — and the LTP becomes available', async () => {
     expect((await refusal(() => decideProfessionalRegistration(po, se.id, { decision: 'APPROVED', remarks: 'not mine' }, META))).status).toBe(403);
     expect((await availableProfessionals({ purpose: 'STRUCTURAL' })).some((p) => p.registrationId === se.id)).toBe(false);
     await decideProfessionalRegistration(zjd, se.id, { decision: 'APPROVED', remarks: 'Registered.' }, META);
@@ -315,7 +315,7 @@ describe.skipIf(!dbUp)('professional registration', () => {
     expect(detail.filesNamed).toBe(1);
   });
 
-  it('application integration: change of professional offers only approved, in-force, linked professionals', async () => {
+  it('application integration: change of LTP offers only approved, in-force, linked LTPs', async () => {
     const before = await eligibleProfessionals(ltpB.id);
     expect(before.some((p) => p.id === ltpA.id)).toBe(true);
     expect(before.find((p) => p.id === ltpA.id)?.registrationNumber).toMatch(/^LTP\//);

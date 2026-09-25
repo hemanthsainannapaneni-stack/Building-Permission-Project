@@ -13,7 +13,7 @@ import { advanceOrder, ensureApprovalOrder } from '@/server/services/approval-or
 import { storeApprovalOrderPdf } from '@/server/services/approval-order-pdf';
 import { ORDER_STATUS } from '@/lib/approval-orders';
 import { sweepSla } from '@/server/workflow/sla';
-import { expireLapsedDeveloperRegistrations } from '@/server/services/developer-registrations';
+import { expireLapsedDeveloperRegistrations, notifyDeveloperRenewalsDue } from '@/server/services/developer-registrations';
 import { expireLapsedProfessionalRegistrations } from '@/server/services/professional-registrations';
 import { JOB_TYPES, type ClaimedJob } from './queue';
 
@@ -288,6 +288,11 @@ register(JOB_TYPES.SWEEP_SLA, async () => {
 register(JOB_TYPES.EXPIRE_DEVELOPER_REGISTRATIONS, async () => {
   const report = await expireLapsedDeveloperRegistrations();
   if (report.expired) console.log(`[developers] expiry sweep: ${report.expired} of ${report.examined} expired`);
+});
+
+register(JOB_TYPES.NOTIFY_DEVELOPER_RENEWALS_DUE, async () => {
+  const report = await notifyDeveloperRenewalsDue();
+  if (report.notified) console.log(`[developers] renewal-due sweep: ${report.notified} of ${report.examined} notified`);
 });
 
 register(JOB_TYPES.EXPIRE_PROFESSIONAL_REGISTRATIONS, async () => {

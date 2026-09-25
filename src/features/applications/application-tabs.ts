@@ -37,7 +37,7 @@ export type TabKey =
   | 'workflow'
   | 'shortfalls'
   | 'proceedings'
-  | 'professional'
+  | 'ltp'
   | 'commencement'
   | 'occupancy'
   | 'communications'
@@ -187,13 +187,13 @@ export const APPLICATION_TABS: readonly TabDef[] = [
     capabilities: [C.SHOW_CAUSE_VIEW],
   },
   {
-    key: 'professional',
-    label: 'Technical Professional',
+    key: 'ltp',
+    label: 'LTP',
     available: true,
     phase: '',
     description:
-      'Who holds this file and may submit drawings, everyone who has held it, and any request to change the professional.',
-    capabilities: [C.PROFESSIONAL_CHANGE_VIEW],
+      'Who holds this file and may submit drawings, everyone who has held it, and any request to change the LTP.',
+    capabilities: [C.LTP_CHANGE_VIEW],
   },
   {
     key: 'commencement',
@@ -240,3 +240,7 @@ export function visibleTabs(capabilities: string[]): TabDef[] {
 
 export const isTabKey = (value: string): value is TabKey =>
   APPLICATION_TABS.some((tab) => tab.key === value);
+
+/** Tab keys that were renamed. A link or bookmark made before the rename still opens the right tab. */
+const RENAMED_TAB_KEYS: Record<string, TabKey> = { professional: 'ltp' };
+export const resolveTabKey = (value: string): string => RENAMED_TAB_KEYS[value] ?? value;

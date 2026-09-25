@@ -61,15 +61,15 @@ export const PROFESSIONAL_STEPS = ['EDIT', 'SUBMIT', 'TAKE_UP', 'CHECK_DOCUMENT'
 export type ProfessionalStep = (typeof PROFESSIONAL_STEPS)[number];
 
 export const PROFESSIONAL_STEP_CAPABILITY: Record<ProfessionalStep, string> = {
-  EDIT: 'PROFESSIONAL_REG_REGISTER',
-  SUBMIT: 'PROFESSIONAL_REG_REGISTER',
-  RESPOND: 'PROFESSIONAL_REG_REGISTER',
-  RENEW: 'PROFESSIONAL_REG_REGISTER',
-  TAKE_UP: 'PROFESSIONAL_REG_VERIFY',
-  CHECK_DOCUMENT: 'PROFESSIONAL_REG_VERIFY',
-  SHORTFALL: 'PROFESSIONAL_REG_VERIFY',
-  VERIFY: 'PROFESSIONAL_REG_VERIFY',
-  DECIDE: 'PROFESSIONAL_REG_DECIDE',
+  EDIT: 'LTP_REG_REGISTER',
+  SUBMIT: 'LTP_REG_REGISTER',
+  RESPOND: 'LTP_REG_REGISTER',
+  RENEW: 'LTP_REG_REGISTER',
+  TAKE_UP: 'LTP_REG_VERIFY',
+  CHECK_DOCUMENT: 'LTP_REG_VERIFY',
+  SHORTFALL: 'LTP_REG_VERIFY',
+  VERIFY: 'LTP_REG_VERIFY',
+  DECIDE: 'LTP_REG_DECIDE',
 };
 
 export const PROFESSIONAL_STEP_FROM: Record<Exclude<ProfessionalStep, 'RENEW'>, ProfessionalStatus> = {
@@ -162,8 +162,8 @@ export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** DEMO WORDING of the consent the professional signs. Stored with the registration when given. */
 export const CONSENT_TEXT =
-  'I consent to my particulars being entered in the authority’s register of professionals and shown to applicants choosing a ' +
-  'professional, and to their verification with the registration body named. I will inform the authority of any change, ' +
+  'I consent to my particulars being entered in the authority’s register of LTPs and shown to applicants choosing an ' +
+  'LTP, and to their verification with the registration body named. I will inform the authority of any change, ' +
   'suspension or cancellation of my licence.';
 
 export type ProfessionalParticulars = {
@@ -184,9 +184,9 @@ export type ProfessionalParticulars = {
 export function professionalProblems(p: ProfessionalParticulars, types: readonly { code: string; isActive: boolean }[], now: Date): Record<string, string> {
   const out: Record<string, string> = {};
   const type = types.find((t) => t.code === p.professionalType);
-  if (!type) out.professionalType = 'Choose the professional type.';
-  else if (!type.isActive) out.professionalType = 'This professional type is no longer registered.';
-  if (p.name.trim().length < 3) out.name = 'Enter the professional’s full name.';
+  if (!type) out.professionalType = 'Choose the LTP type.';
+  else if (!type.isActive) out.professionalType = 'This LTP type is no longer registered.';
+  if (p.name.trim().length < 3) out.name = 'Enter the LTP’s full name.';
   if (p.licenceNo.trim().length < 3) out.licenceNo = 'Enter the licence number issued by the registration body.';
   if (p.registrationBody.trim().length < 3) out.registrationBody = 'Name the body that issued the licence.';
   if (p.qualification.trim().length < 2) out.qualification = 'Enter the qualification.';
@@ -196,7 +196,7 @@ export function professionalProblems(p: ProfessionalParticulars, types: readonly
   if (!EMAIL_PATTERN.test(p.email)) out.email = 'Enter a valid email address.';
   if (!p.licenceValidTo) out.licenceValidTo = 'Enter the date the licence is valid to.';
   else if (isLapsed(p.licenceValidTo, now)) out.licenceValidTo = 'The licence has lapsed. It must be renewed with the registration body first.';
-  if (!p.consentGiven) out.consentGiven = 'The professional’s consent is required.';
+  if (!p.consentGiven) out.consentGiven = 'The LTP’s consent is required.';
   return out;
 }
 
@@ -353,7 +353,7 @@ export const PROFESSIONAL_REGISTERS = ['ALL', 'PENDING', 'IN_PROCESS', 'SHORTFAL
 export type ProfessionalRegister = (typeof PROFESSIONAL_REGISTERS)[number];
 
 export const PROFESSIONAL_REGISTER_LABEL: Record<ProfessionalRegister, string> = {
-  ALL: 'All Professionals',
+  ALL: 'All LTPs',
   PENDING: 'Pending',
   IN_PROCESS: 'In Process',
   SHORTFALL: 'Shortfall',
@@ -364,10 +364,10 @@ export const PROFESSIONAL_REGISTER_LABEL: Record<ProfessionalRegister, string> =
 };
 
 export const PROFESSIONAL_REGISTER_HINT: Record<ProfessionalRegister, string> = {
-  ALL: 'Every professional, as their latest registration stands',
+  ALL: 'Every LTP, as their latest registration stands',
   PENDING: 'Submitted, not yet taken up',
   IN_PROCESS: 'Under scrutiny',
-  SHORTFALL: 'Waiting on the professional',
+  SHORTFALL: 'Waiting on the LTP',
   VERIFIED: 'Verified, awaiting decision',
   REJECTED: 'Applications refused',
   EXPIRED: 'Validity lapsed, not renewed',

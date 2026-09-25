@@ -88,6 +88,18 @@ export type DeveloperRegistrationView = {
   createdAt: string;
 };
 
+export type DeveloperAuditRow = {
+  id: string;
+  seq: number;
+  action: string;
+  actorName: string;
+  actorRoleKey: string;
+  before: unknown;
+  after: unknown;
+  remarks: string;
+  occurredAt: string;
+};
+
 export type DeveloperDetailPayload = {
   registration: DeveloperRegistrationView;
   requiredDocuments: string[];
@@ -95,6 +107,7 @@ export type DeveloperDetailPayload = {
   openRenewal: { id: string; applicationNumber: string } | null;
   chain: Array<{ id: string; applicationNumber: string; kind: string; status: string; isCurrent: boolean; validFrom: string | null; validTo: string | null; decidedAt: string | null; createdAt: string }>;
   events: HistoryEvent[];
+  auditTrail: DeveloperAuditRow[];
   permissions: {
     edit: Offer;
     submit: Offer;

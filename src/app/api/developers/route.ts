@@ -1,7 +1,7 @@
 import { defineRoute } from '@/server/http/route';
 import { CAPABILITIES } from '@/lib/constants';
 import { badRequest } from '@/server/http/errors';
-import { isDeveloperRegister, isDeveloperType } from '@/lib/developer-registration';
+import { isDeveloperRegister, isDeveloperStatus, isDeveloperType } from '@/lib/developer-registration';
 import { developerDraftSchema } from '@/lib/schemas/developer-registration';
 import { createDeveloperDraft, developerRegisterSummary, listDeveloperRegistrations } from '@/server/services/developer-registrations';
 import { readDeveloperUploads } from '@/server/developers/uploads';
@@ -13,9 +13,13 @@ export const GET = defineRoute(
   async ({ user, searchParams }) => {
     const register = searchParams.get('register') ?? '';
     const type = searchParams.get('type') ?? '';
+    const status = searchParams.get('status') ?? '';
     const query = {
       register: isDeveloperRegister(register) ? register : undefined,
       type: isDeveloperType(type) ? type : undefined,
+      status: isDeveloperStatus(status) ? status : undefined,
+      dateFrom: searchParams.get('dateFrom')?.trim() || undefined,
+      dateTo: searchParams.get('dateTo')?.trim() || undefined,
       q: searchParams.get('q')?.trim() || undefined,
       page: Number(searchParams.get('page') ?? 1) || 1,
       pageSize: Number(searchParams.get('pageSize') ?? 20) || 20,

@@ -46,6 +46,16 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },
+  // The Professionals module is the LTP module now. Bookmarks, emailed links and
+  // notifications written before the rename keep working. Temporary (307) rather
+  // than permanent, so a browser never caches a redirect we might want to change.
+  async redirects() {
+    return [
+      { source: '/professionals/:path*', destination: '/ltp/:path*', permanent: false },
+      { source: '/professional-changes/:path*', destination: '/ltp-changes/:path*', permanent: false },
+      { source: '/admin/settings/professional-types', destination: '/admin/settings/ltp-types', permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;

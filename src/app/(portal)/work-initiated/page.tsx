@@ -24,7 +24,7 @@ export default async function WorkInitiatedPage({ searchParams }: { searchParams
     <div className="space-y-3.5">
       <PageHeader
         title="Work Initiated"
-        description="After approval: Approved → Proceeding issued → Work initiated. The technical professional notifies commencement once the building permission order is issued."
+        description="After approval: Approved → Proceeding issued → Work initiated. The LTP notifies commencement once the building permission order is issued."
       />
       <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard label="Proceeding not issued" value={summary.awaiting} hint="Approved, order not yet issued" icon={FileClock} tone="neutral" href="/work-initiated?state=AWAITING_PROCEEDING" />

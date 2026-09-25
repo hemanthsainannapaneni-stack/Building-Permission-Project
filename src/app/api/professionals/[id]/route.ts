@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 /** One registration: particulars, documents and their checks, validity, history, and the steps open to the caller. */
 export const GET = defineRoute(async ({ user, params }) => getProfessionalRegistration(user, params.id), {
-  capabilities: [CAPABILITIES.PROFESSIONAL_REG_VIEW],
+  capabilities: [CAPABILITIES.LTP_REG_VIEW],
 });
 
 /** Saves a DRAFT's particulars and adds documents, as MULTIPART. */
@@ -22,5 +22,5 @@ export const POST = defineRoute(
     }
     return updateProfessionalDraft(user, params.id, { ...parsed.data, uploads }, { ip, userAgent, correlationId });
   },
-  { capabilities: [CAPABILITIES.PROFESSIONAL_REG_REGISTER], rateLimit: 'upload' }
+  { capabilities: [CAPABILITIES.LTP_REG_REGISTER], rateLimit: 'upload' }
 );

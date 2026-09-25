@@ -45,8 +45,8 @@ const optionalUuid = z
   .pipe(z.string().uuid('Choose an account from the list.').nullable());
 
 export const professionalDraftSchema = z.object({
-  professionalType: text(60).min(1, 'Choose the professional type.'),
-  name: text(200).min(2, 'Enter the professional’s name.'),
+  professionalType: text(60).min(1, 'Choose the LTP type.'),
+  name: text(200).min(2, 'Enter the LTP’s name.'),
   userId: optionalUuid,
   licenceNo: text(60).optional().default(''),
   registrationBody: text(200).optional().default(''),
@@ -88,7 +88,7 @@ export const professionalShortfallSchema = z.object({
 export type ProfessionalShortfallInput = z.infer<typeof professionalShortfallSchema>;
 
 export const professionalRespondSchema = z.object({
-  remarks: text(4000).min(10, 'Say what the professional has supplied or corrected.'),
+  remarks: text(4000).min(10, 'Say what the LTP has supplied or corrected.'),
   demoDocuments: flag,
   demoKinds: z.string().optional().default(''),
   expectedStatus: expected,

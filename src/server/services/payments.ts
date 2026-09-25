@@ -2,6 +2,7 @@ import 'server-only';
 import type { Prisma } from '@prisma/client';
 import { prisma, type Db, type Tx } from '@/server/db/prisma';
 import { applicationScope } from '@/server/auth/scope';
+import { isPublicApplicant } from '@/server/public-portal/actor';
 import { can, type AuthUser } from '@/server/auth/context';
 import { env } from '@/server/config/env';
 import { audit } from './audit';
@@ -174,7 +175,10 @@ async function requireDemand(user: AuthUser, demandId: string) {
   if (!isUuid(demandId)) throw notFound('That demand could not be found.');
 
   const demand = await prisma.applicationFee.findFirst({
-    where: { id: demandId, application: { deletedAt: null, ...applicationScope(user) } },
+    // The public portal's payer is not scoped to a jurisdiction or an LTP: whoever holds an
+    // application number and the applicant's mobile may make the demonstration payment. The actor
+    // is built only by `src/server/public-portal/payments.ts`, after it has checked both.
+    where: { id: demandId, application: { deletedAt: null, ...(isPublicApplicant(user) ? {} : applicationScope(user)) } },
     select: {
       ...DEMAND_SELECT,
       application: {

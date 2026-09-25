@@ -8,5 +8,5 @@ export const dynamic = 'force-dynamic';
 /** Takes a pending application up for scrutiny: SUBMITTED → IN_PROCESS. */
 export const POST = defineRoute(
   async ({ user, params, body, ip, userAgent, correlationId }) => takeUpProfessionalRegistration(user, params.id, body, { ip, userAgent, correlationId }),
-  { capabilities: [CAPABILITIES.PROFESSIONAL_REG_VERIFY], schema: professionalRemarksSchema }
+  { capabilities: [CAPABILITIES.LTP_REG_VERIFY], schema: professionalRemarksSchema }
 );

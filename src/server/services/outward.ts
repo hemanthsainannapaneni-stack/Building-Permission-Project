@@ -82,7 +82,7 @@ function sourceLink(sourceType: string, sourceId: string): string {
   if (sourceType === 'ShowCauseNotice') return `/show-cause/${sourceId}`;
   if (sourceType === 'RevocationProceeding') return `/revocations/${sourceId}`;
   if (sourceType === 'DeveloperRegistration') return `/developers/${sourceId}`;
-  if (sourceType === 'ProfessionalRegistration') return `/professionals/${sourceId}`;
+  if (sourceType === 'ProfessionalRegistration') return `/ltp/${sourceId}`;
   return '';
 }
 

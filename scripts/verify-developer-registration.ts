@@ -16,13 +16,30 @@
  *    letter in Outward for every approval; each row's events a coherent
  *    chain ending at its status, each move audited.
  * 3. READ REFUSALS only — see section 3.
+ * 4. NOTIFICATIONS: the seven DEVELOPER_REGISTRATION_* events have templates
+ *    on every channel, every event fired at least once against this data,
+ *    and every fired event was actually queued as an outbox row.
+ * 5. APPLICATION INTEGRATION: the picker a building-permission application
+ *    uses (`availableDevelopers`) offers only approved, in-force
+ *    registrations, and every application that names a developer names a
+ *    real, still-existing registration.
  */
 import { PrismaClient } from '@prisma/client';
 import { RBAC_MATRIX } from '../src/lib/rbac-matrix';
 import type { AuthUser } from '../src/server/auth/context';
 import { isApiError } from '../src/server/http/errors';
 import { DEVELOPER_REGISTERS, DEVELOPER_STATUSES, dayOf } from '../src/lib/developer-registration';
-import { developerRegisterSummary, listDeveloperRegistrations } from '../src/server/services/developer-registrations';
+import { availableDevelopers, developerRegisterSummary, listDeveloperRegistrations } from '../src/server/services/developer-registrations';
+
+const DEVELOPER_NOTIFICATION_EVENTS = [
+  'DEVELOPER_REGISTRATION_SUBMITTED',
+  'DEVELOPER_REGISTRATION_SHORTFALL_RAISED',
+  'DEVELOPER_REGISTRATION_RESPONSE_RECEIVED',
+  'DEVELOPER_REGISTRATION_REVIEW_REQUIRED',
+  'DEVELOPER_REGISTRATION_APPROVED',
+  'DEVELOPER_REGISTRATION_REJECTED',
+  'DEVELOPER_REGISTRATION_RENEWAL_DUE',
+];
 
 const prisma = new PrismaClient();
 const MATRIX = RBAC_MATRIX as unknown as Record<string, readonly string[]>;
@@ -177,6 +194,38 @@ async function main() {
   console.log('\n3. Refusals');
   const ltp = await actor('LTP');
   if (ltp) check('LTP cannot read the register', (await refusedWith(() => listDeveloperRegistrations(ltp, {}))) === 403);
+
+  // ── 4. Notifications ─────────────────────────────────────────────────────
+  console.log('\n4. Notifications');
+  const templates = await prisma.notificationTemplate.findMany({ where: { eventCode: { in: DEVELOPER_NOTIFICATION_EVENTS } }, select: { eventCode: true, channel: true } });
+  for (const evt of DEVELOPER_NOTIFICATION_EVENTS) {
+    const channels = templates.filter((t) => t.eventCode === evt).map((t) => t.channel).sort();
+    check(`${evt} has an IN_APP, EMAIL and SMS template`, channels.join(',') === 'EMAIL,IN_APP,SMS', channels.join(','));
+  }
+  const outboxByEvent = await prisma.outboxEvent.groupBy({ by: ['eventCode'], where: { eventCode: { in: DEVELOPER_NOTIFICATION_EVENTS } }, _count: { _all: true } });
+  for (const evt of DEVELOPER_NOTIFICATION_EVENTS) {
+    const count = outboxByEvent.find((o) => o.eventCode === evt)?._count._all ?? 0;
+    check(`${evt} was fired at least once`, count > 0, `${count} queued or delivered`);
+  }
+  const logged = await prisma.notificationLog.count({ where: { eventCode: { in: DEVELOPER_NOTIFICATION_EVENTS } } });
+  check('at least one notification was actually dispatched (queued rows alone are not enough)', logged > 0, `${logged} delivery log rows`);
+
+  // ── 5. Application integration ───────────────────────────────────────────
+  console.log('\n5. Application integration');
+  const available = await availableDevelopers();
+  check('the picker offers at least one developer', available.length > 0, `${available.length} available`);
+  const availableIds = new Set(available.map((d) => d.registrationId));
+  const approvedCurrent = rows.filter((r) => r.isCurrent && r.status === 'APPROVED' && r.validTo! >= today);
+  check(
+    'the picker offers exactly the approved, current, in-force registrations — nothing else',
+    approvedCurrent.every((r) => availableIds.has(r.id)) && available.every((a) => approvedCurrent.some((r) => r.id === a.registrationId))
+  );
+  const named = await prisma.applicant.findMany({ where: { developerRegistrationId: { not: null } }, select: { developerRegistrationId: true } });
+  check(
+    'every application that names a developer names a real registration',
+    named.every((n) => byId.has(n.developerRegistrationId!)),
+    `${named.length} applications carry a developer`
+  );
 
   console.log(`\n${passed} passed, ${failures.length} failed`);
   if (failures.length) {

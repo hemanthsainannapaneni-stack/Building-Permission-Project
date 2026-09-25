@@ -8,5 +8,5 @@ export const dynamic = 'force-dynamic';
 /** The REVIEW_PROFESSIONAL_CHANGE workflow step. */
 export const POST = defineRoute<ProfessionalChangeStepInput>(
   async ({ user, params, body, ip, userAgent, correlationId }) => reviewProfessionalChange(user, params.id, body, { ip, userAgent, correlationId }),
-  { capabilities: [CAPABILITIES.PROFESSIONAL_CHANGE_REVIEW], schema: professionalChangeStepSchema }
+  { capabilities: [CAPABILITIES.LTP_CHANGE_REVIEW], schema: professionalChangeStepSchema }
 );

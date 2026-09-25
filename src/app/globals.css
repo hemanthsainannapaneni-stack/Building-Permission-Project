@@ -111,3 +111,55 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/**
+ * The public portal — text size, contrast and the skip link.
+ *
+ * ── Text size ───────────────────────────────────────────────────────────
+ *
+ * The portal's A+ / A / A- buttons set `data-public-text-size` on <html>
+ * (and remove it again when the visitor leaves the portal — see
+ * src/features/public-portal/preferences.tsx). The attribute scales the ROOT
+ * font size, so every rem-based Tailwind size and spacing scales with it.
+ *
+ * The design system's own sizes (`text-small`, `text-body`…) are fixed pixels
+ * and would ignore that, so inside `.public-portal` they are restated in rem.
+ * They are restated only there: the workspace's sizes are untouched.
+ */
+@layer base {
+  html[data-public-text-size='-1'] { font-size: 90%; }
+  html[data-public-text-size='1'] { font-size: 112.5%; }
+  html[data-public-text-size='2'] { font-size: 125%; }
+
+  .public-portal .text-caption { font-size: 0.75rem; }
+  .public-portal .text-small { font-size: 0.8125rem; }
+  .public-portal .text-body { font-size: 0.875rem; }
+  .public-portal .text-h2 { font-size: 1rem; }
+  .public-portal .text-h1 { font-size: 1.25rem; }
+  .public-portal .text-display { font-size: 1.5rem; }
+
+  /* High contrast: darker ink, harder borders, underlined links. Scoped to the portal. */
+  html[data-public-contrast='high'] .public-portal {
+    --bg: 255 255 255;
+    --surface: 255 255 255;
+    --surface-sunk: 240 240 240;
+    --border: 40 40 40;
+    --border-strong: 0 0 0;
+    --text: 0 0 0;
+    --text-muted: 20 20 20;
+    --text-subtle: 50 50 50;
+    --primary: 0 0 170;
+    --primary-hover: 0 0 120;
+    --primary-subtle: 230 235 255;
+    --info: 0 60 140;
+    --success: 0 90 40;
+    --warning: 120 60 0;
+    --danger: 160 0 0;
+  }
+  html[data-public-contrast='high'] .public-portal a:not([class*='bg-']) { text-decoration: underline; }
+
+  .public-portal :focus-visible {
+    outline: 3px solid rgb(var(--primary));
+    outline-offset: 2px;
+  }
+}

@@ -27,6 +27,7 @@ import {
   computeValidity,
   dayOf,
   isDeveloperDocumentKind,
+  isDeveloperAvailable,
   isDeveloperOpen,
   latestDocuments,
   missingDeveloperDocuments,
@@ -48,13 +49,15 @@ import type {
   DeveloperSubmitInput,
   DeveloperVerifyInput,
 } from '@/lib/schemas/developer-registration';
+import { PUBLIC_APPLICANT_ROLE, isPublicApplicant } from '@/server/public-portal/actor';
 import { createOutwardEntry } from '@/server/proceedings/engine';
 import { renderDemoAttachment } from '@/server/proceedings/documents';
 import { formatNumber, nextSequence } from './numbering';
 import { settingNumber } from './settings';
 import { roleTitle } from './show-cause';
 import { storeUpload } from './files';
-import { audit } from './audit';
+import { audit, entityAudit } from './audit';
+import { emit, EVENTS } from '@/server/events/outbox';
 
 /**
  * THE DEVELOPER REGISTRATION SERVICE.
@@ -126,6 +129,9 @@ function requireView(user: AuthUser) {
 async function actingRole(user: AuthUser, step: DeveloperStep): Promise<string | null> {
   const capability = DEVELOPER_STEP_CAPABILITY[step];
   if (!can(user, capability)) return null;
+  // The public portal's applicant has no account and no role. Its steps are recorded as the
+  // applicant's own, not as the inward desk that keys applications in — see public-portal/actor.ts.
+  if (isPublicApplicant(user)) return PUBLIC_APPLICANT_ROLE;
   const role = await prisma.role.findFirst({
     where: { key: { in: user.roleKeys }, permissions: { some: { permission: { key: capability } } } },
     orderBy: { rank: 'asc' },
@@ -189,7 +195,15 @@ async function event(tx: Tx, registrationId: string, action: string, fromStatus:
 }
 
 type Move = {
-  row: { id: string; applicationNumber: string; registrationNumber: string | null };
+  row: {
+    id: string;
+    applicationNumber: string;
+    registrationNumber: string | null;
+    /** Present on every real row (precheck's), absent only where a caller has none to give. */
+    developerName?: string;
+    email?: string;
+    mobile?: string;
+  };
   from: DeveloperStatus;
   to: DeveloperStatus;
   data?: Prisma.DeveloperRegistrationUpdateManyMutationInput;
@@ -201,6 +215,14 @@ type Move = {
   now: Date;
   meta: Meta;
   after?: Record<string, unknown>;
+  /**
+   * Puts one row on the outbox in the same transaction as the move, exactly
+   * as the workflow engine's `notify` does for a file — see
+   * src/server/events/outbox.ts and src/server/notifications/recipients.ts.
+   * `assignedRoleKey` is always the DESK THE ROW MOVED TO (`desk`, computed
+   * below), so "review required" always reaches wherever the row now sits.
+   */
+  notify?: { eventCode: string; extra?: Record<string, unknown> };
 };
 
 async function move(tx: Tx, m: Move) {
@@ -221,6 +243,22 @@ async function move(tx: Tx, m: Move) {
     remarks: m.remarks,
     ...m.meta,
   });
+  if (m.notify) {
+    await emit(tx, {
+      eventCode: m.notify.eventCode,
+      applicationId: null,
+      payload: {
+        developerRegistrationId: m.row.id,
+        registrationNumber: m.row.registrationNumber || m.row.applicationNumber,
+        developerName: m.row.developerName ?? '',
+        contactName: m.row.developerName ?? '',
+        contactEmail: m.row.email ?? '',
+        contactPhone: m.row.mobile ?? '',
+        assignedRoleKey: desk,
+        ...m.notify.extra,
+      },
+    });
+  }
   return { id: m.row.id, applicationNumber: m.row.applicationNumber, status: m.to };
 }
 
@@ -283,14 +321,65 @@ export async function expireLapsedDeveloperRegistrations(now = new Date()) {
   return { examined: lapsed.length, expired };
 }
 
+/**
+ * Tells a developer once that their renewal window has opened — a threshold
+ * crossing, not a step anybody takes, so it is a flag (`renewalNotifiedAt`)
+ * and a notification, never a status move or a workflow event. Mirrors how
+ * the SLA sweep notifies once per change of state without touching what an
+ * officer may do (docs R.1.1): this never changes `status`.
+ */
+export async function notifyDeveloperRenewalsDue(now = new Date()) {
+  const due = await prisma.developerRegistration.findMany({
+    where: { isCurrent: true, status: 'APPROVED', renewalDueDate: { lte: now }, renewalNotifiedAt: null },
+    select: { id: true, applicationNumber: true, registrationNumber: true, developerName: true, email: true, mobile: true, validTo: true, renewalDueDate: true },
+  });
+  let notified = 0;
+  for (const row of due) {
+    try {
+      await prisma.$transaction(async (tx) => {
+        const { count } = await tx.developerRegistration.updateMany({ where: { id: row.id, renewalNotifiedAt: null }, data: { renewalNotifiedAt: now } });
+        if (!count) return; // another sweep already sent it
+        await emit(tx, {
+          eventCode: EVENTS.DEVELOPER_REGISTRATION_RENEWAL_DUE,
+          applicationId: null,
+          payload: {
+            developerRegistrationId: row.id,
+            registrationNumber: row.registrationNumber ?? row.applicationNumber,
+            developerName: row.developerName,
+            contactName: row.developerName,
+            contactEmail: row.email,
+            contactPhone: row.mobile,
+            validTo: row.validTo?.toISOString().slice(0, 10) ?? '',
+            renewalDueDate: row.renewalDueDate?.toISOString().slice(0, 10) ?? '',
+          },
+        });
+        await audit(tx, {
+          action: 'DEVELOPER_REGISTRATION_RENEWAL_DUE_NOTIFIED',
+          entityType: ENTITY,
+          entityId: row.id,
+          after: { registrationNumber: row.registrationNumber, renewalDueDate: row.renewalDueDate?.toISOString().slice(0, 10) },
+          ip: '',
+          userAgent: 'developer-renewal-due-sweep',
+        });
+      });
+      notified += 1;
+    } catch (error) {
+      console.error('[developers] renewal-due notification failed', row.id, error);
+    }
+  }
+  return { examined: due.length, notified };
+}
+
 /** At most once a minute per process: registers are read far more often than a day turns over. */
 async function sweepIfDue() {
   if (Date.now() - lastSweep < 60_000) return;
   lastSweep = Date.now();
-  await expireLapsedDeveloperRegistrations().catch((error) => {
-    lastSweep = 0;
-    console.error('[developers] expiry sweep failed', error);
-  });
+  await expireLapsedDeveloperRegistrations()
+    .then(() => notifyDeveloperRenewalsDue())
+    .catch((error) => {
+      lastSweep = 0;
+      console.error('[developers] expiry sweep failed', error);
+    });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -320,13 +409,27 @@ function registerWhere(register: DeveloperRegister): Prisma.DeveloperRegistratio
   }
 }
 
-export type DeveloperListQuery = { register?: DeveloperRegister; q?: string; type?: string; page?: number; pageSize?: number };
+export type DeveloperListQuery = {
+  register?: DeveloperRegister;
+  q?: string;
+  type?: string;
+  /** Narrows further within a register — chiefly useful on ALL. */
+  status?: DeveloperStatus;
+  /** Submitted on or after / on or before this day (inclusive). */
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  pageSize?: number;
+};
 
 export async function listDeveloperRegistrations(user: AuthUser, query: DeveloperListQuery = {}) {
   requireView(user);
   await sweepIfDue();
   const and: Prisma.DeveloperRegistrationWhereInput[] = [registerWhere(query.register ?? 'ALL')];
   if (query.type) and.push({ developerType: query.type });
+  if (query.status) and.push({ status: query.status });
+  if (query.dateFrom) and.push({ submittedAt: { gte: new Date(`${query.dateFrom}T00:00:00.000Z`) } });
+  if (query.dateTo) and.push({ submittedAt: { lte: new Date(`${query.dateTo}T23:59:59.999Z`) } });
   const q = query.q?.trim();
   if (q) {
     and.push({
@@ -418,7 +521,7 @@ export async function getDeveloperRegistration(user: AuthUser, id: string) {
   requireView(user);
   await sweepIfDue();
   const row = await requireRow(id);
-  const [events, chain, openRenewal] = await Promise.all([
+  const [events, chain, openRenewal, auditTrail] = await Promise.all([
     prisma.developerRegistrationEvent.findMany({ where: { registrationId: row.id }, orderBy: { occurredAt: 'desc' } }),
     prisma.developerRegistration.findMany({
       where: { lineageId: row.lineageId },
@@ -426,6 +529,9 @@ export async function getDeveloperRegistration(user: AuthUser, id: string) {
       select: { id: true, applicationNumber: true, kind: true, status: true, isCurrent: true, validFrom: true, validTo: true, decidedAt: true, createdAt: true },
     }),
     openRenewalOf(row.lineageId, row.id),
+    // The hash-chained audit trail, not the domain event log above: the same
+    // rows `move()` writes on every step, `entityType` 'DeveloperRegistration'.
+    entityAudit(ENTITY, row.id),
   ]);
 
   const renewRole = await actingRole(user, 'RENEW');
@@ -457,6 +563,7 @@ export async function getDeveloperRegistration(user: AuthUser, id: string) {
     openRenewal,
     chain,
     events,
+    auditTrail,
     permissions: { edit, submit, takeUp, shortfall, respond, verify, decide, renew, demoAllowed: env.demoMode },
   };
 }
@@ -619,6 +726,7 @@ export async function submitDeveloperRegistration(user: AuthUser, id: string, in
         now,
         meta,
         after: { kind: row.kind, documents: docs(row.documents).length },
+        notify: { eventCode: EVENTS.DEVELOPER_REGISTRATION_SUBMITTED },
       }),
     TX_LIMITS
   );
@@ -645,6 +753,7 @@ export async function respondDeveloperShortfall(user: AuthUser, id: string, inpu
         now,
         meta,
         after: { round, documents: added.map((d) => ({ kind: d.kind, fileName: d.fileName, isDemo: d.isDemo })) },
+        notify: { eventCode: EVENTS.DEVELOPER_REGISTRATION_RESPONSE_RECEIVED },
       }),
     TX_LIMITS
   );
@@ -770,6 +879,7 @@ export async function raiseDeveloperShortfall(user: AuthUser, id: string, input:
         now,
         meta,
         after: { round: row.round, items: input.items },
+        notify: { eventCode: EVENTS.DEVELOPER_REGISTRATION_SHORTFALL_RAISED, extra: { items: input.items.join('; ') } },
       }),
     TX_LIMITS
   );
@@ -800,6 +910,7 @@ export async function verifyDeveloperRegistration(user: AuthUser, id: string, in
         now,
         meta,
         after: { outcome: input.outcome },
+        notify: { eventCode: EVENTS.DEVELOPER_REGISTRATION_REVIEW_REQUIRED, extra: { outcome: input.outcome } },
       }),
     TX_LIMITS
   );
@@ -830,6 +941,7 @@ export async function decideDeveloperRegistration(user: AuthUser, id: string, in
           now,
           meta,
           after: { kind: row.kind, verificationOutcome: row.verificationOutcome },
+          notify: { eventCode: EVENTS.DEVELOPER_REGISTRATION_REJECTED, extra: { decisionRemarks: input.remarks } },
         }),
       TX_LIMITS
     );
@@ -906,8 +1018,62 @@ export async function decideDeveloperRegistration(user: AuthUser, id: string, in
         renewalOf: predecessor?.applicationNumber ?? null,
         outwardNumber: outward.outwardNumber,
       },
+      notify: {
+        eventCode: EVENTS.DEVELOPER_REGISTRATION_APPROVED,
+        extra: { registrationNumber, validFrom: validity.validFrom.toISOString().slice(0, 10), validTo: validity.validTo.toISOString().slice(0, 10) },
+      },
     }).then((r) => ({ ...r, registrationNumber, outwardNumber: outward.outwardNumber, validTo: validity.validTo }));
   }, TX_LIMITS);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// For applications — who a building-permission file may name as its developer
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Approved, current, unexpired developer registrations a building-permission
+ * application may name (Phase 11 application integration). Never the whole
+ * administrative register — an LTP filing a form sees only this. Public, like
+ * the occupied-professional register: no row scope applies.
+ */
+export async function availableDevelopers(opts: { q?: string } = {}) {
+  const rows = await prisma.developerRegistration.findMany({
+    where: {
+      isCurrent: true,
+      status: 'APPROVED',
+      validTo: { gte: today() },
+      ...(opts.q
+        ? {
+            OR: [
+              { developerName: { contains: opts.q, mode: 'insensitive' as const } },
+              { organization: { contains: opts.q, mode: 'insensitive' as const } },
+              { registrationNumber: { contains: opts.q, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+    },
+    orderBy: [{ developerName: 'asc' }],
+    take: 200,
+  });
+  return rows.map((r) => ({
+    registrationId: r.id,
+    registrationNumber: r.registrationNumber ?? '',
+    developerType: r.developerType,
+    developerName: r.developerName,
+    organization: r.organization,
+    authorizedPerson: r.authorizedPerson,
+    mobile: r.mobile,
+    validTo: r.validTo,
+  }));
+}
+
+/** The developer register entry an application names — refused unless approved and in force today. */
+export async function requireAvailableDeveloper(tx: Tx, registrationId: string) {
+  const r = isUuid(registrationId) ? await tx.developerRegistration.findUnique({ where: { id: registrationId } }) : null;
+  if (!r || !isDeveloperAvailable(r, new Date())) {
+    throw businessRule('Choose a developer registration that is approved and in force.');
+  }
+  return r;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

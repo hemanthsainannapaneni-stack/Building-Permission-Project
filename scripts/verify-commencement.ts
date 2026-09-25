@@ -183,7 +183,7 @@ async function main() {
     check('exactly one workflow step recorded it', history.length === 1, `${history.length}`);
     const h = history[0];
     check('the step is the one the notice names', h?.sequence === n.workflowSequence);
-    check('given by the file’s technical professional, as LTP', h?.actorId === n.notifiedById && n.notifiedById === app.ltpUserId && h?.actorRoleKey === 'LTP');
+    check('given by the file’s LTP, as LTP', h?.actorId === n.notifiedById && n.notifiedById === app.ltpUserId && h?.actorRoleKey === 'LTP');
     check('the file did not move (CLOSED_APPROVED, APPROVED)', h?.fromStageCode === 'CLOSED_APPROVED' && h?.toStageCode === 'CLOSED_APPROVED' && h?.fromStatus === 'APPROVED' && h?.toStatus === 'APPROVED');
     check('the file is still approved', app.status === 'APPROVED' && app.currentStageCode === 'CLOSED_APPROVED', `${app.status} @ ${app.currentStageCode}`);
     check('worked under an ISSUED, unrevoked order', app.approvalOrder?.status === 'ISSUED' && !app.approvalOrder.revokedAt && app.approvalOrder.id === n.approvalOrderId);

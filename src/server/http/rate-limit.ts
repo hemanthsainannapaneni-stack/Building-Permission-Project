@@ -89,6 +89,13 @@ export const RATE_LIMITS = {
   paymentInitiate: { limit: 10, windowSeconds: 60 * 60 },
   webhook: { limit: 100, windowSeconds: 60 },
   publicVerify: { limit: 30, windowSeconds: 60 },
+  // The public portal's registers and dashboard: paged, aggregated reads that
+  // return no identifier a caller did not already hold. Looser than
+  // `publicVerify`, which guards lookups by reference number.
+  publicBrowse: { limit: 120, windowSeconds: 60 },
+  // A registration or renewal filed from the public portal writes rows and
+  // stores files, with no account behind it to attribute the abuse to.
+  publicSubmit: { limit: 10, windowSeconds: 60 * 60 },
   default: { limit: 300, windowSeconds: 60 },
 } as const;
 

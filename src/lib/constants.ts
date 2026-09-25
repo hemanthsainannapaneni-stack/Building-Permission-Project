@@ -158,17 +158,17 @@ export const CAPABILITIES = {
   OUTWARD_VIEW: 'OUTWARD_VIEW',
   OUTWARD_MANAGE: 'OUTWARD_MANAGE',
 
-  // Change of technical professional (Phase 8)
+  // Change of LTP (Phase 8)
   //
   // One grant per step, like the show cause grants. Each step is a workflow
   // transition on the file; because a change request travels desk to desk
   // independently of where the FILE is, the step's desk is whoever holds its
   // capability — see src/lib/professional-change.ts. Viewing is shared.
-  PROFESSIONAL_CHANGE_VIEW: 'PROFESSIONAL_CHANGE_VIEW',
-  PROFESSIONAL_CHANGE_REQUEST: 'PROFESSIONAL_CHANGE_REQUEST',
-  PROFESSIONAL_CHANGE_VERIFY: 'PROFESSIONAL_CHANGE_VERIFY',
-  PROFESSIONAL_CHANGE_REVIEW: 'PROFESSIONAL_CHANGE_REVIEW',
-  PROFESSIONAL_CHANGE_DECIDE: 'PROFESSIONAL_CHANGE_DECIDE',
+  LTP_CHANGE_VIEW: 'LTP_CHANGE_VIEW',
+  LTP_CHANGE_REQUEST: 'LTP_CHANGE_REQUEST',
+  LTP_CHANGE_VERIFY: 'LTP_CHANGE_VERIFY',
+  LTP_CHANGE_REVIEW: 'LTP_CHANGE_REVIEW',
+  LTP_CHANGE_DECIDE: 'LTP_CHANGE_DECIDE',
 
   // Commencement of work (Phase 9)
   //
@@ -206,17 +206,17 @@ export const CAPABILITIES = {
   DEVELOPER_VERIFY: 'DEVELOPER_VERIFY',
   DEVELOPER_DECIDE: 'DEVELOPER_DECIDE',
 
-  // Professional registration (Phase 12)
+  // LTP register (Phase 12)
   //
   // The register of architects, engineers, structural engineers, LTPs and any
   // other configured type. Split by act exactly as the developer register is:
   // one desk registers, one verifies (including each document), one decides.
-  // Applications NAME an approved professional; that needs no grant beyond
+  // Applications NAME an approved LTP; that needs no grant beyond
   // editing the application. See src/lib/professional-registration.ts.
-  PROFESSIONAL_REG_VIEW: 'PROFESSIONAL_REG_VIEW',
-  PROFESSIONAL_REG_REGISTER: 'PROFESSIONAL_REG_REGISTER',
-  PROFESSIONAL_REG_VERIFY: 'PROFESSIONAL_REG_VERIFY',
-  PROFESSIONAL_REG_DECIDE: 'PROFESSIONAL_REG_DECIDE',
+  LTP_REG_VIEW: 'LTP_REG_VIEW',
+  LTP_REG_REGISTER: 'LTP_REG_REGISTER',
+  LTP_REG_VERIFY: 'LTP_REG_VERIFY',
+  LTP_REG_DECIDE: 'LTP_REG_DECIDE',
 
   // Shortfalls
   SHORTFALL_CREATE: 'SHORTFALL_CREATE',

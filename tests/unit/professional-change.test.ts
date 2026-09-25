@@ -27,7 +27,7 @@ import { requestProfessionalChangeSchema, decideProfessionalChangeSchema } from 
  * workflow rows that record it.
  */
 
-describe('change of professional lifecycle', () => {
+describe('change of LTP lifecycle', () => {
   it('runs Request → Verification → Review → Approval │ Rejection', () => {
     expect(PROFESSIONAL_CHANGE_STATUSES).toEqual(['PENDING_VERIFICATION', 'UNDER_REVIEW', 'PENDING_DECISION', 'APPROVED', 'REJECTED']);
     expect(NEXT_STEP.PENDING_VERIFICATION).toBe('VERIFY');
@@ -63,7 +63,7 @@ describe('documents', () => {
     expect(missingAtRequest(['OWNER_REQUEST_LETTER', 'NEW_PROFESSIONAL_CONSENT'])).toEqual([]);
   });
 
-  it('needs a release from the outgoing professional — NOC or termination — to verify', () => {
+  it('needs a release from the outgoing LTP — NOC or termination — to verify', () => {
     expect(hasRelease(['OWNER_REQUEST_LETTER'])).toBe(false);
     expect(hasRelease(['CURRENT_PROFESSIONAL_NOC'])).toBe(true);
     expect(hasRelease(['TERMINATION_LETTER'])).toBe(true);
@@ -109,7 +109,7 @@ describe('each step is one desk’s, by grant', () => {
   });
 
   it('lets the applicant see requests on the files it holds', () => {
-    expect(RBAC_MATRIX[ROLES.LTP]).toContain(CAPABILITIES.PROFESSIONAL_CHANGE_VIEW);
+    expect(RBAC_MATRIX[ROLES.LTP]).toContain(CAPABILITIES.LTP_CHANGE_VIEW);
   });
 });
 
@@ -173,7 +173,7 @@ describe('the BBAS_STANDARD branch, as configuration', () => {
 });
 
 describe('input shapes', () => {
-  it('requires a proposed professional, a date and a reason', () => {
+  it('requires a proposed LTP, a date and a reason', () => {
     expect(requestProfessionalChangeSchema.safeParse({ proposedProfessionalId: '', requestDate: '', reason: '' }).success).toBe(false);
     const ok = requestProfessionalChangeSchema.safeParse({
       proposedProfessionalId: '6f1c2f0a-6a8f-4b7e-9d8e-2f6c1a0b3c4d',

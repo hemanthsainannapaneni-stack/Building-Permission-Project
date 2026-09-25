@@ -16,5 +16,5 @@ export const GET = defineRoute(
     const mine = searchParams.get('mine') === 'true';
     return availableProfessionals({ purpose, userId: mine ? user.id : undefined, q: searchParams.get('q')?.trim() || undefined });
   },
-  { capabilities: [CAPABILITIES.APPLICATION_EDIT, CAPABILITIES.PROFESSIONAL_CHANGE_REQUEST, CAPABILITIES.PROFESSIONAL_REG_VIEW] }
+  { capabilities: [CAPABILITIES.APPLICATION_EDIT, CAPABILITIES.LTP_CHANGE_REQUEST, CAPABILITIES.LTP_REG_VIEW] }
 );

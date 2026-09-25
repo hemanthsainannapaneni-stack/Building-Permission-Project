@@ -300,14 +300,14 @@ const ACTIONS: ActionSeed[] = [
   //
   // SYSTEM-kind, all five: raised by the professional change service on
   // behalf of the officer taking the step, after it has checked the step's
-  // capability (PROFESSIONAL_CHANGE_*) and the officer's jurisdiction. A
+  // capability (LTP_CHANGE_*) and the officer's jurisdiction. A
   // request travels TPA → Planning Officer → ZDD → ZJD wherever the file
   // itself is, and a desk transition may only be granted to a role owning the
   // file's stage — so the desk is the capability's holder, and the engine
   // records the step in the file's history with that officer's name.
   {
     code: 'REQUEST_PROFESSIONAL_CHANGE',
-    label: 'Change of technical professional requested',
+    label: 'Change of LTP requested',
     kind: 'SYSTEM',
     intent: 'secondary',
     capabilityKey: '',
@@ -316,7 +316,7 @@ const ACTIONS: ActionSeed[] = [
   },
   {
     code: 'VERIFY_PROFESSIONAL_CHANGE',
-    label: 'Change of technical professional verified',
+    label: 'Change of LTP verified',
     kind: 'SYSTEM',
     intent: 'secondary',
     capabilityKey: '',
@@ -325,7 +325,7 @@ const ACTIONS: ActionSeed[] = [
   },
   {
     code: 'REVIEW_PROFESSIONAL_CHANGE',
-    label: 'Change of technical professional reviewed',
+    label: 'Change of LTP reviewed',
     kind: 'SYSTEM',
     intent: 'secondary',
     capabilityKey: '',
@@ -334,7 +334,7 @@ const ACTIONS: ActionSeed[] = [
   },
   {
     code: 'APPROVE_PROFESSIONAL_CHANGE',
-    label: 'Change of technical professional approved',
+    label: 'Change of LTP approved',
     kind: 'SYSTEM',
     intent: 'secondary',
     capabilityKey: '',
@@ -343,7 +343,7 @@ const ACTIONS: ActionSeed[] = [
   },
   {
     code: 'REJECT_PROFESSIONAL_CHANGE',
-    label: 'Change of technical professional rejected',
+    label: 'Change of LTP rejected',
     kind: 'SYSTEM',
     intent: 'secondary',
     capabilityKey: '',

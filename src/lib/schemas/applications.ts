@@ -294,6 +294,13 @@ export const ltpStepSchema = z.object({
    */
   professionalRegistrationId: z.string().uuid().or(z.literal('')).optional().default(''),
   structuralEngineerRegistrationId: z.string().uuid().or(z.literal('')).optional().default(''),
+  /**
+   * The developer register entry chosen (Phase 11), where the project has a
+   * developer distinct from the owner. Id only — the particulars are read
+   * from the register on the server, and it must be approved and in force
+   * when the step is saved.
+   */
+  developerRegistrationId: z.string().uuid().or(z.literal('')).optional().default(''),
 });
 export type LtpStepInput = z.infer<typeof ltpStepSchema>;
 

@@ -5,5 +5,5 @@ import { getProfessionalChange } from '@/server/services/professional-changes';
 export const dynamic = 'force-dynamic';
 
 export const GET = defineRoute(async ({ user, params }) => getProfessionalChange(user, params.id), {
-  capabilities: [CAPABILITIES.PROFESSIONAL_CHANGE_VIEW],
+  capabilities: [CAPABILITIES.LTP_CHANGE_VIEW],
 });

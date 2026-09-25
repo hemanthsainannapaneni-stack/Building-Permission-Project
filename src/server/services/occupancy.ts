@@ -520,7 +520,7 @@ async function precheck(user: AuthUser, app: ApplicationRow, step: Exclude<Occup
 export async function submitOccupancyApplication(user: AuthUser, applicationId: string, input: SubmitOccupancyInput & { uploads?: OccupancyUploads }, meta: Meta) {
   requireView(user);
   const app = await requireApplication(user, applicationId);
-  if (!(await actingRole(user, 'SUBMIT'))) throw forbidden('Completion is intimated by the file’s technical professional.');
+  if (!(await actingRole(user, 'SUBMIT'))) throw forbidden('Completion is intimated by the file’s LTP.');
   const blocker = await submitBlocker(app);
   if (blocker) throw conflict(blocker);
   const dateProblem = completionDateProblem(input.completionDate, app.workCommencement?.commencementDate ?? null, new Date());

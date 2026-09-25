@@ -21,5 +21,5 @@ export const GET = defineRoute(
       },
     });
   },
-  { capabilities: [CAPABILITIES.PROFESSIONAL_CHANGE_VIEW] }
+  { capabilities: [CAPABILITIES.LTP_CHANGE_VIEW] }
 );

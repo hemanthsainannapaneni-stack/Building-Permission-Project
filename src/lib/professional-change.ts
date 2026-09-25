@@ -79,10 +79,10 @@ export type ProfessionalChangeStep = (typeof PROFESSIONAL_CHANGE_STEPS)[number];
 
 /** The capability each step needs. Whoever holds it is that step's desk. */
 export const PROFESSIONAL_CHANGE_STEP_CAPABILITY: Record<ProfessionalChangeStep, string> = {
-  REQUEST: 'PROFESSIONAL_CHANGE_REQUEST',
-  VERIFY: 'PROFESSIONAL_CHANGE_VERIFY',
-  REVIEW: 'PROFESSIONAL_CHANGE_REVIEW',
-  DECIDE: 'PROFESSIONAL_CHANGE_DECIDE',
+  REQUEST: 'LTP_CHANGE_REQUEST',
+  VERIFY: 'LTP_CHANGE_VERIFY',
+  REVIEW: 'LTP_CHANGE_REVIEW',
+  DECIDE: 'LTP_CHANGE_DECIDE',
 };
 
 /** The step a request in this status is waiting for. Null once decided. */
@@ -115,13 +115,13 @@ export type ProfessionalChangeDocumentKind = (typeof PROFESSIONAL_CHANGE_DOCUMEN
 
 export const PROFESSIONAL_CHANGE_DOCUMENT_LABEL: Record<ProfessionalChangeDocumentKind, string> = {
   OWNER_REQUEST_LETTER: 'Owner request letter',
-  CURRENT_PROFESSIONAL_NOC: 'Current professional NOC',
+  CURRENT_PROFESSIONAL_NOC: 'Current LTP NOC',
   TERMINATION_LETTER: 'Termination letter',
   FEE_SETTLEMENT: 'Fee settlement',
   INDEMNITY: 'Indemnity',
   RESPONSIBILITY_HANDOVER: 'Responsibility handover',
   STRUCTURAL_RESPONSIBILITY_HANDOVER: 'Structural responsibility handover',
-  NEW_PROFESSIONAL_CONSENT: 'New professional consent',
+  NEW_PROFESSIONAL_CONSENT: 'New LTP consent',
 };
 
 export const isProfessionalChangeDocumentKind = (v: string): v is ProfessionalChangeDocumentKind =>
@@ -183,7 +183,7 @@ export const COMPARISON_FIELDS: ReadonlyArray<{ key: keyof ProfessionalSnapshot;
   { key: 'licenceNo', label: 'Licence number' },
   { key: 'licenceClass', label: 'Licence class' },
   { key: 'validUpto', label: 'Licence valid up to' },
-  { key: 'registrationNumber', label: 'Professional registration' },
+  { key: 'registrationNumber', label: 'LTP registration' },
   { key: 'firmName', label: 'Firm' },
   { key: 'email', label: 'Email' },
   { key: 'phone', label: 'Phone' },

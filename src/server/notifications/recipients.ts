@@ -36,7 +36,13 @@ export type RecipientRule =
   | 'ASSIGNED_OFFICER'
   | 'STAGE_ROLE'
   | 'ESCALATION_ROLE'
-  | 'USER';
+  | 'USER'
+  /**
+   * The developer (or professional) named on a registration that carries no
+   * applicationId and no portal account. Read straight from the event's own
+   * payload rather than looked up — there is no `applicants` row to join to.
+   */
+  | 'REGISTRATION_CONTACT';
 
 /**
  * Which rules apply to which event, and whether the message is transactional.
@@ -100,6 +106,18 @@ const RULES: Record<string, { rules: RecipientRule[]; mandatory?: boolean }> = {
   // names none. The department sees it on the Work Initiated register.
   WORK_INITIATED: { rules: ['LTP', 'APPLICANT', 'STAGE_ROLE'] },
   OCCUPANCY_SUBMITTED: { rules: ['LTP', 'APPLICANT', 'STAGE_ROLE'], mandatory: true },
+
+  // Developer registration (Phase 11). STAGE_ROLE addresses whichever desk
+  // the row now sits at (payload.assignedRoleKey = currentDeskRoleKey, set by
+  // the service after every move); REGISTRATION_CONTACT addresses the
+  // developer directly, by the particulars on the registration.
+  DEVELOPER_REGISTRATION_SUBMITTED: { rules: ['STAGE_ROLE'] },
+  DEVELOPER_REGISTRATION_SHORTFALL_RAISED: { rules: ['STAGE_ROLE', 'REGISTRATION_CONTACT'], mandatory: true },
+  DEVELOPER_REGISTRATION_RESPONSE_RECEIVED: { rules: ['STAGE_ROLE'] },
+  DEVELOPER_REGISTRATION_REVIEW_REQUIRED: { rules: ['STAGE_ROLE'] },
+  DEVELOPER_REGISTRATION_APPROVED: { rules: ['REGISTRATION_CONTACT'], mandatory: true },
+  DEVELOPER_REGISTRATION_REJECTED: { rules: ['REGISTRATION_CONTACT'], mandatory: true },
+  DEVELOPER_REGISTRATION_RENEWAL_DUE: { rules: ['REGISTRATION_CONTACT'], mandatory: true },
 
   USER_CREATED: { rules: ['USER'], mandatory: true },
   PASSWORD_RESET: { rules: ['USER'], mandatory: true },
@@ -196,12 +214,25 @@ export async function resolveRecipients(
         // Only when nobody holds it personally: telling a whole desk about a
         // file one of them has already claimed is how an inbox becomes noise.
         if (payload.assignedUserId) break;
-        const roleKey = String(payload.assignedRoleKey ?? '');
-        if (!roleKey) break;
-
-        for (const officer of await usersInRole(roleKey, application?.zoneId ?? null)) {
-          found.push({ ...officer, reason: `Works at the ${roleKey} desk`, mandatory });
+        // Comma-separated where several roles share the next step's capability
+        // (a register desk's `currentDeskRoleKey`, e.g. developer registration) —
+        // every one of them is worth telling, the same as a single role is.
+        const roleKeys = String(payload.assignedRoleKey ?? '').split(',').map((k) => k.trim()).filter(Boolean);
+        for (const roleKey of roleKeys) {
+          for (const officer of await usersInRole(roleKey, application?.zoneId ?? null)) {
+            found.push({ ...officer, reason: `Works at the ${roleKey} desk`, mandatory });
+          }
         }
+        break;
+      }
+
+      case 'REGISTRATION_CONTACT': {
+        const name = String(payload.contactName ?? '');
+        const email = String(payload.contactEmail ?? '');
+        const phone = String(payload.contactPhone ?? '');
+        // No account, so no in-app row — the adapter records that honestly.
+        if (!name || (!email && !phone)) break;
+        found.push({ userId: null, name, email, phone, reason: 'Named on the registration', mandatory });
         break;
       }
 

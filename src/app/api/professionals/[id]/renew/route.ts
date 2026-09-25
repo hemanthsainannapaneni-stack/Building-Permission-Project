@@ -8,5 +8,5 @@ export const dynamic = 'force-dynamic';
 /** Opens a renewal of an approved (due) or expired registration. */
 export const POST = defineRoute(
   async ({ user, params, body, ip, userAgent, correlationId }) => renewProfessionalRegistration(user, params.id, body, { ip, userAgent, correlationId }),
-  { capabilities: [CAPABILITIES.PROFESSIONAL_REG_REGISTER], schema: professionalRenewSchema }
+  { capabilities: [CAPABILITIES.LTP_REG_REGISTER], schema: professionalRenewSchema }
 );

@@ -27,7 +27,7 @@ export const GET = defineRoute(
     }
     return listProfessionalRegistrations(user, query);
   },
-  { capabilities: [CAPABILITIES.PROFESSIONAL_REG_VIEW] }
+  { capabilities: [CAPABILITIES.LTP_REG_VIEW] }
 );
 
 /** Opens a registration application as a DRAFT, as MULTIPART. */
@@ -40,5 +40,5 @@ export const POST = defineRoute(
     }
     return createProfessionalDraft(user, { ...parsed.data, uploads }, { ip, userAgent, correlationId });
   },
-  { capabilities: [CAPABILITIES.PROFESSIONAL_REG_REGISTER], rateLimit: 'upload' }
+  { capabilities: [CAPABILITIES.LTP_REG_REGISTER], rateLimit: 'upload' }
 );

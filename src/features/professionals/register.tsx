@@ -36,7 +36,7 @@ export function ProfessionalRegisterTable({
         id: 'number',
         header: 'Registration',
         cell: ({ row }) => (
-          <Link href={`/professionals/${row.original.id}`} className="whitespace-nowrap font-medium text-primary hover:underline">
+          <Link href={`/ltp/${row.original.id}`} className="whitespace-nowrap font-medium text-primary hover:underline">
             {row.original.registrationNumber || 'Not yet registered'}
             <span className="block text-caption font-normal text-text-muted">
               {row.original.applicationNumber}
@@ -47,7 +47,7 @@ export function ProfessionalRegisterTable({
       },
       {
         id: 'professional',
-        header: 'Professional',
+        header: 'LTP',
         cell: ({ row }) => (
           <span className="block max-w-[15rem]">
             <span className="block truncate font-medium text-text">{row.original.name}</span>
@@ -94,7 +94,7 @@ export function ProfessionalRegisterTable({
             )}
             {row.original.currentDesk !== 'Closed' && <span className="block text-caption text-text-muted">{row.original.currentDesk}</span>}
             {row.original.openRenewal && (
-              <Link href={`/professionals/${row.original.openRenewal.id}`} className="block text-caption text-primary hover:underline">
+              <Link href={`/ltp/${row.original.openRenewal.id}`} className="block text-caption text-primary hover:underline">
                 Renewal {row.original.openRenewal.applicationNumber}
               </Link>
             )}
@@ -116,7 +116,7 @@ export function ProfessionalRegisterTable({
           value={r.search}
           onChange={(e) => r.setSearch(e.target.value)}
         />
-        <select aria-label="Professional type" className={selectClass} value={r.filters.type} onChange={(e) => r.update({ type: e.target.value })}>
+        <select aria-label="LTP type" className={selectClass} value={r.filters.type} onChange={(e) => r.update({ type: e.target.value })}>
           <option value="">All types</option>
           {types.map((t) => (
             <option key={t.code} value={t.code}>

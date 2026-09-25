@@ -124,6 +124,10 @@ async function scheduleRecurring() {
     dedupeKey: `developer-expiry:${daily}`,
   });
   await enqueue(prisma, {
+    type: JOB_TYPES.NOTIFY_DEVELOPER_RENEWALS_DUE,
+    dedupeKey: `developer-renewal-due:${daily}`,
+  });
+  await enqueue(prisma, {
     type: JOB_TYPES.EXPIRE_PROFESSIONAL_REGISTRATIONS,
     dedupeKey: `professional-expiry:${daily}`,
   });

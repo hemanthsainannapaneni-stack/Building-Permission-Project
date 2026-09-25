@@ -37,7 +37,7 @@ export function ProfessionalComparison({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <UserRound className="size-4" /> {approved ? 'Previous professional → new professional' : 'Current professional → proposed professional'}
+          <UserRound className="size-4" /> {approved ? 'Previous LTP → new LTP' : 'Current LTP → proposed LTP'}
         </CardTitle>
         <CardDescription>
           Particulars as they stood on the day of the request. Rows that differ are marked.
@@ -46,9 +46,9 @@ export function ProfessionalComparison({
       <CardContent className="space-y-3">
         {/* Stacked summary: who, then who next. */}
         <div className="grid gap-2 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
-          <Party label={approved ? 'Previous professional' : 'Current professional'} p={current} valid={valid(current)} tone="muted" />
+          <Party label={approved ? 'Previous LTP' : 'Current LTP'} p={current} valid={valid(current)} tone="muted" />
           <ArrowDown className="mx-auto size-5 text-text-muted sm:-rotate-90" aria-hidden />
-          <Party label={approved ? 'New professional (active)' : 'Proposed professional'} p={proposed} valid={valid(proposed)} tone="primary" />
+          <Party label={approved ? 'New LTP (active)' : 'Proposed LTP'} p={proposed} valid={valid(proposed)} tone="primary" />
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[32rem] text-small">
@@ -108,10 +108,10 @@ export function EngagementHistory({ engagements }: { engagements: Engagement[] }
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <History className="size-4" /> Professional history
+          <History className="size-4" /> LTP history
         </CardTitle>
         <CardDescription>
-          Every technical professional who has held this file. A replaced professional stays on the record; only the active one may submit drawings.
+          Every LTP who has held this file. A replaced LTP stays on the record; only the active one may submit drawings.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -140,14 +140,14 @@ export function EngagementHistory({ engagements }: { engagements: Engagement[] }
                   {' · '}
                   {e.source === 'ORIGINAL_FILING' ? 'Filed the application' : 'Engaged by '}
                   {e.broughtInBy && (
-                    <Link href={`/professional-changes/${e.broughtInBy.id}`} className="text-primary hover:underline">
+                    <Link href={`/ltp-changes/${e.broughtInBy.id}`} className="text-primary hover:underline">
                       {e.broughtInBy.requestNumber}
                     </Link>
                   )}
                   {e.endedBy && (
                     <>
                       {' · replaced by '}
-                      <Link href={`/professional-changes/${e.endedBy.id}`} className="text-primary hover:underline">
+                      <Link href={`/ltp-changes/${e.endedBy.id}`} className="text-primary hover:underline">
                         {e.endedBy.requestNumber}
                       </Link>
                     </>

@@ -95,10 +95,10 @@ export const NAV: NavSection[] = [
         capabilities: [C.REVOCATION_VIEW],
       },
       {
-        label: 'Change of Professional',
-        href: '/professional-changes',
+        label: 'Change of LTP',
+        href: '/ltp-changes',
         icon: UserRoundCog,
-        capabilities: [C.PROFESSIONAL_CHANGE_VIEW],
+        capabilities: [C.LTP_CHANGE_VIEW],
       },
       {
         label: 'Work Initiated',
@@ -119,10 +119,10 @@ export const NAV: NavSection[] = [
         capabilities: [C.DEVELOPER_VIEW],
       },
       {
-        label: 'Professionals',
-        href: '/professionals',
+        label: 'LTP',
+        href: '/ltp',
         icon: IdCard,
-        capabilities: [C.PROFESSIONAL_REG_VIEW],
+        capabilities: [C.LTP_REG_VIEW],
       },
       {
         label: 'Outward',
@@ -185,7 +185,9 @@ const SEGMENT_LABELS: Record<string, string> = {
   'show-cause': 'Show Cause',
   revocations: 'Revoke Proceedings',
   outward: 'Outward Register',
-  'professional-changes': 'Change of Professional',
+  ltp: 'LTP',
+  'ltp-changes': 'Change of LTP',
+  'ltp-types': 'LTP Types',
   'work-initiated': 'Work Initiated',
   occupancy: 'Occupancy',
   payments: 'Payments',

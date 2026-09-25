@@ -20,9 +20,9 @@ const flag = z
 
 /** Arrives as MULTIPART — every field a string. Documents travel as files. */
 export const requestProfessionalChangeSchema = z.object({
-  proposedProfessionalId: z.string().uuid('Choose the proposed professional.'),
+  proposedProfessionalId: z.string().uuid('Choose the proposed LTP.'),
   requestDate: isoDate,
-  reason: text(4000).min(10, 'Say why the owner wants to change the professional.'),
+  reason: text(4000).min(10, 'Say why the owner wants to change the LTP.'),
   /** Demo mode only: labelled placeholders for the kinds in `demoKinds` not uploaded. */
   demoDocuments: flag,
   /** Comma-separated document kinds. Empty with demoDocuments: every kind not uploaded. */

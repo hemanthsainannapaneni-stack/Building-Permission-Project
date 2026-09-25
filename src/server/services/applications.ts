@@ -32,6 +32,7 @@ import { BUCKETS, bucketFor } from '@/lib/application-buckets';
 import { CLOSED_SHORTFALL_STATUSES } from '@/lib/constants';
 import { isUuid } from '@/lib/utils';
 import { requireAvailable } from './professional-registrations';
+import { requireAvailableDeveloper } from './developer-registrations';
 import { settingString } from './settings';
 
 /**
@@ -364,6 +365,7 @@ const STEP_MAPPERS: Record<DataStepKey, StepMapper> = {
       remarks: (app.ltpDeclaration as { remarks?: string } | null)?.remarks ?? '',
       professionalRegistrationId: app.applicant?.ltpRegistrationId ?? '',
       structuralEngineerRegistrationId: app.applicant?.structuralEngineerRegistrationId ?? '',
+      developerRegistrationId: app.applicant?.developerRegistrationId ?? '',
     }),
     // Written by saveStep directly — the licence particulars are read from the
     // filing LTP's own record on the server and never accepted from the
@@ -656,7 +658,7 @@ async function applyStepWrite(tx: Tx, app: DetailApplication, write: StepWrite) 
  * The result is frozen into `ltpDeclaration`: a licence may lapse or change
  * class after filing, and the record must show what was true at the time.
  */
-type LtpStepWrite = { declarationAccepted: true; remarks: string; professionalRegistrationId: string; structuralEngineerRegistrationId: string };
+type LtpStepWrite = { declarationAccepted: true; remarks: string; professionalRegistrationId: string; structuralEngineerRegistrationId: string; developerRegistrationId: string };
 
 async function applyLtpStep(tx: Tx, app: DetailApplication, data: LtpStepWrite) {
   const ltp = await tx.user.findUnique({
@@ -691,6 +693,10 @@ async function applyLtpStep(tx: Tx, app: DetailApplication, data: LtpStepWrite) 
   const structural = data.structuralEngineerRegistrationId
     ? await requireAvailable(tx, data.structuralEngineerRegistrationId, 'STRUCTURAL')
     : null;
+  // The developer register (Phase 11), on the same footing: named only where
+  // the project has a developer distinct from the owner, and only an
+  // approved, in-force registration may be named.
+  const developer = data.developerRegistrationId ? await requireAvailableDeveloper(tx, data.developerRegistrationId) : null;
   await tx.applicant.upsert({
     where: { applicationId: app.id },
     create: {
@@ -701,6 +707,10 @@ async function applyLtpStep(tx: Tx, app: DetailApplication, data: LtpStepWrite) 
       structuralEngineerName: structural?.name ?? '',
       structuralEngineerPhone: structural?.mobile ?? '',
       structuralEngineerRegNo: structural?.registrationNumber ?? '',
+      developerRegistrationId: developer?.id ?? null,
+      developerName: developer?.developerName ?? '',
+      developerPhone: developer?.mobile ?? '',
+      developerRegistrationNo: developer?.registrationNumber ?? '',
     },
     update: {
       ltpRegistrationId: own?.id ?? null,
@@ -712,6 +722,12 @@ async function applyLtpStep(tx: Tx, app: DetailApplication, data: LtpStepWrite) 
           ? { structuralEngineerName: '', structuralEngineerPhone: '', structuralEngineerRegNo: '' }
           : {}),
       ...(!own && app.applicant?.ltpRegistrationId ? { professionalRegistrationRef: '' } : {}),
+      developerRegistrationId: developer?.id ?? null,
+      ...(developer
+        ? { developerName: developer.developerName, developerPhone: developer.mobile, developerRegistrationNo: developer.registrationNumber ?? '' }
+        : app.applicant?.developerRegistrationId
+          ? { developerName: '', developerPhone: '', developerRegistrationNo: '' }
+          : {}),
     },
   });
 
@@ -731,6 +747,7 @@ async function applyLtpStep(tx: Tx, app: DetailApplication, data: LtpStepWrite) 
         remarks: data.remarks,
         professionalRegistration: own ? { id: own.id, number: own.registrationNumber, type: own.professionalType, validTo: own.validTo?.toISOString() ?? null } : null,
         structuralEngineer: structural ? { id: structural.id, number: structural.registrationNumber, name: structural.name } : null,
+        developer: developer ? { id: developer.id, number: developer.registrationNumber, name: developer.developerName, validTo: developer.validTo?.toISOString() ?? null } : null,
       } as never,
     },
   });

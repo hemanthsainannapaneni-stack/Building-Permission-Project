@@ -55,6 +55,7 @@ import type {
   ProfessionalVerifyInput,
   UpdateProfessionalTypeInput,
 } from '@/lib/schemas/professional-registration';
+import { PUBLIC_APPLICANT_ROLE, isPublicApplicant } from '@/server/public-portal/actor';
 import { createOutwardEntry } from '@/server/proceedings/engine';
 import { renderDemoAttachment } from '@/server/proceedings/documents';
 import { formatNumber, nextSequence } from './numbering';
@@ -106,7 +107,7 @@ const today = () => dayOf(new Date());
 let clock: () => Date = () => new Date();
 
 export async function withProfessionalClock<T>(at: Date, fn: () => Promise<T>): Promise<T> {
-  if (env.isProduction) throw new Error('The professional clock can only be set by the demo seed.');
+  if (env.isProduction) throw new Error('The LTP clock can only be set by the demo seed.');
   const previous = clock;
   clock = () => new Date(at.getTime());
   try {
@@ -140,12 +141,15 @@ const typeCodes = async (pred: (t: ProfessionalTypeOption) => boolean) => (await
 // ═══════════════════════════════════════════════════════════════════════════
 
 function requireView(user: AuthUser) {
-  if (!can(user, CAPABILITIES.PROFESSIONAL_REG_VIEW)) throw forbidden('Your role does not include the professional register.');
+  if (!can(user, CAPABILITIES.LTP_REG_VIEW)) throw forbidden('Your role does not include the LTP register.');
 }
 
 async function actingRole(user: AuthUser, step: ProfessionalStep): Promise<string | null> {
   const capability = PROFESSIONAL_STEP_CAPABILITY[step];
   if (!can(user, capability)) return null;
+  // The public portal's applicant has no account and no role. Its steps are recorded as the
+  // applicant's own, not as the inward desk that keys applications in — see public-portal/actor.ts.
+  if (isPublicApplicant(user)) return PUBLIC_APPLICANT_ROLE;
   const role = await prisma.role.findFirst({
     where: { key: { in: user.roleKeys }, permissions: { some: { permission: { key: capability } } } },
     orderBy: { rank: 'asc' },
@@ -156,7 +160,7 @@ async function actingRole(user: AuthUser, step: ProfessionalStep): Promise<strin
 
 async function requireRole(user: AuthUser, step: ProfessionalStep) {
   const roleKey = await actingRole(user, step);
-  if (!roleKey) throw forbidden('This step of a professional registration is not your desk’s.');
+  if (!roleKey) throw forbidden('This step of an LTP registration is not your desk’s.');
   return roleKey;
 }
 
@@ -179,9 +183,9 @@ function deskLabel(roleKeys: string, status: string) {
 }
 
 async function requireRow(id: string) {
-  if (!isUuid(id)) throw notFound('That professional registration could not be found.');
+  if (!isUuid(id)) throw notFound('That LTP registration could not be found.');
   const row = await prisma.professionalRegistration.findUnique({ where: { id } });
-  if (!row) throw notFound('That professional registration could not be found.');
+  if (!row) throw notFound('That LTP registration could not be found.');
   return row;
 }
 
@@ -425,7 +429,7 @@ async function accountProblem(row: { userId: string | null; licenceNo: string; p
     select: { status: true, deletedAt: true, ltpLicenceNo: true, roles: { select: { role: { select: { key: true } } } } },
   });
   if (!u || u.deletedAt || u.status !== 'ACTIVE') return 'The linked portal account is not active.';
-  if (!u.roles.some((r) => r.role.key === ROLES.LTP)) return 'The linked portal account is not a technical professional’s account.';
+  if (!u.roles.some((r) => r.role.key === ROLES.LTP)) return 'The linked portal account is not an LTP’s account.';
   if (u.ltpLicenceNo && row.licenceNo && u.ltpLicenceNo.trim().toUpperCase() !== row.licenceNo.trim().toUpperCase()) {
     return `The linked account holds licence ${u.ltpLicenceNo}, not ${row.licenceNo}.`;
   }
@@ -498,7 +502,7 @@ export async function getProfessionalRegistration(user: AuthUser, id: string) {
 
 /** Portal accounts a registration may be linked to: active LTP accounts, with any registration they already hold. */
 export async function linkableAccounts(user: AuthUser) {
-  if (!can(user, CAPABILITIES.PROFESSIONAL_REG_REGISTER)) throw forbidden('Only the registering desk links accounts.');
+  if (!can(user, CAPABILITIES.LTP_REG_REGISTER)) throw forbidden('Only the registering desk links accounts.');
   const users = await prisma.user.findMany({
     // Administrators' all-roles accounts hold LTP too; they are not professionals.
     where: { status: 'ACTIVE', deletedAt: null, AND: [{ roles: { some: { role: { key: ROLES.LTP } } } }, { roles: { none: { role: { key: ROLES.SYSTEM_ADMIN } } } }] },
@@ -567,7 +571,7 @@ function particularsOf(input: ProfessionalDraftInput, now: Date) {
 async function requireKnownType(code: string) {
   const types = await professionalTypes();
   const t = types.find((x) => x.code === code);
-  if (!t) throw badRequest('Choose the professional type.', [{ path: 'professionalType', message: 'Unknown professional type.' }]);
+  if (!t) throw badRequest('Choose the LTP type.', [{ path: 'professionalType', message: 'Unknown LTP type.' }]);
   return { types, type: t };
 }
 
@@ -579,7 +583,7 @@ export async function createProfessionalDraft(user: AuthUser, input: Professiona
   requireView(user);
   const roleKey = await requireRole(user, 'EDIT');
   const { type } = await requireKnownType(input.professionalType);
-  if (!type.isActive) throw badRequest('That professional type is no longer registered.');
+  if (!type.isActive) throw badRequest('That LTP type is no longer registered.');
   const id = randomUUID();
   const uploads = input.uploads ?? {};
   const documents = await storeDocuments(id, user, uploads, demoKindsOf(input, uploads), 1);
@@ -678,7 +682,7 @@ export async function submitProfessionalRegistration(user: AuthUser, id: string,
     },
     select: { applicationNumber: true, registrationNumber: true },
   });
-  if (clash) throw conflict(`This professional is already on ${clash.registrationNumber ?? clash.applicationNumber}. Renew or amend that registration instead.`);
+  if (clash) throw conflict(`This LTP is already on ${clash.registrationNumber ?? clash.applicationNumber}. Renew or amend that registration instead.`);
   const now = clock();
   return prisma.$transaction(
     (tx) =>
@@ -976,7 +980,7 @@ export async function decideProfessionalRegistration(user: AuthUser, id: string,
         documentReference: registrationNumber,
         sourceType: ENTITY,
         sourceId: row.id,
-        subject: `${type?.label ?? 'Professional'} registration${row.kind === 'RENEWAL' ? ' renewed' : ''} ${registrationNumber} — ${row.name}`,
+        subject: `${type?.label ?? 'LTP'} registration${row.kind === 'RENEWAL' ? ' renewed' : ''} ${registrationNumber} — ${row.name}`,
         recipient: [row.name, row.organization].filter(Boolean).join(', '),
         address: [row.address, row.district, row.pincode].filter(Boolean).join(', '),
         status: 'READY_FOR_DISPATCH',
@@ -1101,10 +1105,10 @@ export async function requireAvailable(tx: Tx, registrationId: string, purpose: 
     throw businessRule(
       purpose === 'STRUCTURAL'
         ? 'Choose a structural engineer whose registration is approved and in force.'
-        : 'Choose a professional registration that is approved and in force.'
+        : 'Choose an LTP registration that is approved and in force.'
     );
   }
-  if (purpose === 'FILE_HOLDER' && opts.userId && r.userId !== opts.userId) throw businessRule('That registration belongs to a different professional.');
+  if (purpose === 'FILE_HOLDER' && opts.userId && r.userId !== opts.userId) throw businessRule('That registration belongs to a different LTP.');
   return r;
 }
 
@@ -1133,7 +1137,7 @@ export async function readProfessionalDocument(user: AuthUser, id: string, index
 // ═══════════════════════════════════════════════════════════════════════════
 
 function requireConfigure(user: AuthUser) {
-  if (!can(user, CAPABILITIES.MASTER_DATA_MANAGE)) throw forbidden('Only an administrator configures professional types.');
+  if (!can(user, CAPABILITIES.MASTER_DATA_MANAGE)) throw forbidden('Only an administrator configures LTP types.');
 }
 
 export async function listProfessionalTypesForAdmin(user: AuthUser) {
@@ -1149,7 +1153,7 @@ export async function createProfessionalType(user: AuthUser, input: Professional
   requireConfigure(user);
   return prisma.$transaction(async (tx) => {
     const exists = await tx.masterData.findUnique({ where: { category_code: { category: PROFESSIONAL_TYPE_CATEGORY, code: input.code } } });
-    if (exists) throw conflict(`A professional type ${input.code} already exists.`);
+    if (exists) throw conflict(`An LTP type ${input.code} already exists.`);
     const last = await tx.masterData.aggregate({ where: { category: PROFESSIONAL_TYPE_CATEGORY }, _max: { displayOrder: true } });
     const row = await tx.masterData.create({
       data: {
@@ -1168,10 +1172,10 @@ export async function createProfessionalType(user: AuthUser, input: Professional
 
 export async function updateProfessionalType(user: AuthUser, id: string, input: UpdateProfessionalTypeInput, meta: Meta) {
   requireConfigure(user);
-  if (!isUuid(id)) throw notFound('That professional type could not be found.');
+  if (!isUuid(id)) throw notFound('That LTP type could not be found.');
   return prisma.$transaction(async (tx) => {
     const before = await tx.masterData.findUnique({ where: { id } });
-    if (!before || before.category !== PROFESSIONAL_TYPE_CATEGORY) throw notFound('That professional type could not be found.');
+    if (!before || before.category !== PROFESSIONAL_TYPE_CATEGORY) throw notFound('That LTP type could not be found.');
     const old = typeOption(before);
     const { label, isActive, ...meta2 } = input;
     const metadata = {

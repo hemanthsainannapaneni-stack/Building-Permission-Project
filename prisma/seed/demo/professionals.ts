@@ -777,11 +777,11 @@ export async function seedProfessionals(
   const { log } = opts;
   if (!env.demoMode)
     throw new Error(
-      'Professional demo data uses demo placeholder documents and needs DEMO_MODE=true.'
+      'LTP demo data uses demo placeholder documents and needs DEMO_MODE=true.'
     );
   const types = await prisma.masterData.count({ where: { category: 'PROFESSIONAL_TYPE' } });
   if (!types)
-    throw new Error('No professional types configured. Run `npm run professionals:config` first.');
+    throw new Error('No LTP types configured. Run `npm run professionals:config` first.');
 
   const a: Actors = {
     tpa: await actorFor(prisma, ROLES.TPA, 'tpa.demo@example.com'),
@@ -795,11 +795,11 @@ export async function seedProfessionals(
   const fictional = await prisma.professionalRegistration.count({ where: { userId: null } });
   if (fictional) {
     log(
-      `${fictional} unlinked professional registration(s) already exist — fictional professionals not added again.`
+      `${fictional} unlinked LTP registration(s) already exist — fictional LTPs not added again.`
     );
   } else {
     log(
-      `${opts.apply ? 'Creating' : 'Would create'} ${PROFESSIONALS.length} fictional professionals: ${PROFESSIONALS.map((d) => `${d.p.name} (${d.target})`).join(', ')}.`
+      `${opts.apply ? 'Creating' : 'Would create'} ${PROFESSIONALS.length} fictional LTPs: ${PROFESSIONALS.map((d) => `${d.p.name} (${d.target})`).join(', ')}.`
     );
     const years = await settingNumber(
       PROFESSIONAL_VALIDITY_SETTING,

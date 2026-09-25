@@ -359,6 +359,7 @@ export function linkFor(eventCode: string, payload: Record<string, unknown>): st
   const applicationId = String(payload.applicationId ?? '');
   const shortfallId = String(payload.shortfallId ?? '');
 
+  if (eventCode.startsWith('DEVELOPER_REGISTRATION_')) return developerRegistrationLinkFor(payload);
   if (shortfallId) return `${env.appUrl}/shortfalls/${shortfallId}`;
   if (!applicationId) return env.appUrl;
 
@@ -373,4 +374,10 @@ export function linkFor(eventCode: string, payload: Record<string, unknown>): st
   }
 
   return `${env.appUrl}/applications/${applicationId}`;
+}
+
+/** A developer registration's own link, for the events that carry no applicationId. */
+export function developerRegistrationLinkFor(payload: Record<string, unknown>): string {
+  const id = String(payload.developerRegistrationId ?? '');
+  return id ? `${env.appUrl}/developers/${id}` : env.appUrl;
 }

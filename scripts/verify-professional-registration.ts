@@ -85,17 +85,17 @@ async function main() {
   );
   check('applicants carry the two register links', cols.length === 2);
   const grants = await prisma.rolePermission.findMany({
-    where: { permission: { key: { startsWith: 'PROFESSIONAL_REG_' } } },
+    where: { permission: { key: { startsWith: 'LTP_REG_' } } },
     select: { role: { select: { key: true } }, permission: { select: { key: true } } },
   });
   const holders = (cap: string) => grants.filter((g) => g.permission.key === cap).map((g) => g.role.key).sort().join(',');
-  check('PROFESSIONAL_REG_REGISTER held by TPA only', holders('PROFESSIONAL_REG_REGISTER') === 'TPA', holders('PROFESSIONAL_REG_REGISTER'));
-  check('PROFESSIONAL_REG_VERIFY held by PLANNING_OFFICER only', holders('PROFESSIONAL_REG_VERIFY') === 'PLANNING_OFFICER', holders('PROFESSIONAL_REG_VERIFY'));
-  check('PROFESSIONAL_REG_DECIDE held by ZJD only', holders('PROFESSIONAL_REG_DECIDE') === 'ZJD', holders('PROFESSIONAL_REG_DECIDE'));
+  check('LTP_REG_REGISTER held by TPA only', holders('LTP_REG_REGISTER') === 'TPA', holders('LTP_REG_REGISTER'));
+  check('LTP_REG_VERIFY held by PLANNING_OFFICER only', holders('LTP_REG_VERIFY') === 'PLANNING_OFFICER', holders('LTP_REG_VERIFY'));
+  check('LTP_REG_DECIDE held by ZJD only', holders('LTP_REG_DECIDE') === 'ZJD', holders('LTP_REG_DECIDE'));
   const settings = await prisma.systemSetting.findMany({ where: { group: 'professionals' } });
   check('validity settings present', settings.length === 2, settings.map((s) => `${s.key}=${s.value}`).join(', '));
   const types = await professionalTypes();
-  check('professional types configured', types.length >= 4, types.map((t) => t.code).join(', '));
+  check('LTP types configured', types.length >= 4, types.map((t) => t.code).join(', '));
   check('each type has its own number prefix', new Set(types.map((t) => t.prefix)).size === types.length);
   check('a type may hold files and a type is structural', types.some((t) => t.canHoldFile) && types.some((t) => t.structural));
 
@@ -104,7 +104,7 @@ async function main() {
   const viewer = await actor('VIEWER');
   if (viewer) await listProfessionalRegistrations(viewer, {}); // the expiry sweep, as a register read runs it
   const rows = await prisma.professionalRegistration.findMany({ include: { events: { orderBy: { occurredAt: 'asc' } } }, orderBy: { createdAt: 'asc' } });
-  check('professionals present', rows.length >= 10, `${rows.length} rows`);
+  check('LTPs present', rows.length >= 10, `${rows.length} rows`);
   for (const s of PROFESSIONAL_STATUSES) check(`a registration is ${s}`, rows.some((r) => r.status === s));
   check('a renewal has been approved', rows.some((r) => r.kind === 'RENEWAL' && r.status === 'APPROVED'));
   check('a renewal is under way', rows.some((r) => r.kind === 'RENEWAL' && !['APPROVED', 'REJECTED', 'EXPIRED'].includes(r.status)));
@@ -129,11 +129,11 @@ async function main() {
   );
   const owners = new Map<string, Set<string>>();
   for (const r of issued) owners.set(r.registrationNumber!, (owners.get(r.registrationNumber!) ?? new Set()).add(r.lineageId));
-  check('one registration number per professional, kept across renewals', [...owners.values()].every((s) => s.size === 1));
+  check('one registration number per LTP, kept across renewals', [...owners.values()].every((s) => s.size === 1));
 
   const lineages = new Map<string, typeof rows>();
   for (const r of rows) lineages.set(r.lineageId, [...(lineages.get(r.lineageId) ?? []), r]);
-  check('exactly one current row per professional', [...lineages.values()].every((l) => l.filter((r) => r.isCurrent).length === 1));
+  check('exactly one current row per LTP', [...lineages.values()].every((l) => l.filter((r) => r.isCurrent).length === 1));
   const live = rows.filter((r) => r.isCurrent && !['DRAFT', 'REJECTED', 'EXPIRED'].includes(r.status));
   const key = (r: (typeof rows)[number], by: 'licence' | 'user') => `${r.professionalType}|${by === 'licence' ? r.licenceNo.toUpperCase() : r.userId}`;
   check('no licence registered twice for a type', new Set(live.map((r) => key(r, 'licence'))).size === live.length);
@@ -194,7 +194,7 @@ async function main() {
   console.log('\n3. Applications');
   const holdersNow = await availableProfessionals({ purpose: 'FILE_HOLDER' });
   const structural = await availableProfessionals({ purpose: 'STRUCTURAL' });
-  check('the LTP step can name a file-holding professional', holdersNow.length > 0, `${holdersNow.length} available`);
+  check('the LTP step can name a file-holding LTP', holdersNow.length > 0, `${holdersNow.length} available`);
   check('the LTP step can name a structural engineer', structural.length > 0, `${structural.length} available`);
   const avail = [...holdersNow, ...structural].map((a) => byId.get(a.registrationId)!);
   check('only approved, current, in-force entries are offered', avail.every((r) => r.status === 'APPROVED' && r.isCurrent && r.validTo! >= today));
@@ -206,7 +206,7 @@ async function main() {
   const unregistered = ltpAccounts.filter((u) => !u.professionalRegistrations.length);
   check('every licensed LTP account is on the register (linked, not copied)', !unregistered.length, unregistered.map((u) => u.email).join(', '));
   const eligible = await eligibleProfessionals('00000000-0000-0000-0000-000000000000');
-  check('change of professional offers only registered professionals', eligible.every((e) => holdersNow.some((h) => h.userId === e.id)) && eligible.every((e) => e.registrationNumber));
+  check('change of LTP offers only registered LTPs', eligible.every((e) => holdersNow.some((h) => h.userId === e.id)) && eligible.every((e) => e.registrationNumber));
   const named = await prisma.applicant.findMany({ where: { OR: [{ ltpRegistrationId: { not: null } }, { structuralEngineerRegistrationId: { not: null } }] }, select: { ltpRegistrationId: true, structuralEngineerRegistrationId: true } });
   check('every register link on an application names a real registration', named.every((n) => (!n.ltpRegistrationId || byId.has(n.ltpRegistrationId)) && (!n.structuralEngineerRegistrationId || byId.has(n.structuralEngineerRegistrationId))), `${named.length} linked`);
 
