@@ -1,0 +1,13 @@
+# Local-only artifacts — never uploaded to Vercel
+node_modules
+.next
+.storage
+.env
+.env.*
+!.env.example
+prisma/*.db
+prisma/*.db-journal
+*.tsbuildinfo
+coverage
+test-results
+playwright-report
