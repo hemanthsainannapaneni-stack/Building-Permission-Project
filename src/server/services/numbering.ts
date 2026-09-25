@@ -100,7 +100,8 @@ export const DEFAULT_NUMBER_FORMAT = '{prefix}/{year}/{seq:6}';
 export async function allocateApplicationNumber(
   tx: Tx,
   prefix: string,
-  now: Date = new Date()
+  now: Date = new Date(),
+  configuredTemplate?: string
 ): Promise<{ applicationNumber: string; sequence: number; scope: string }> {
   const year = now.getFullYear();
 
@@ -109,7 +110,7 @@ export async function allocateApplicationNumber(
   const scope = `application:${prefix}:${year}`;
   const seq = await nextSequence(tx, scope);
 
-  const template = await settingString('application_number_format', DEFAULT_NUMBER_FORMAT);
+  const template = configuredTemplate ?? (await settingString('application_number_format', DEFAULT_NUMBER_FORMAT));
 
   return {
     applicationNumber: formatNumber(template || DEFAULT_NUMBER_FORMAT, { prefix, year, seq }),

@@ -32,6 +32,7 @@ import { BUCKETS, bucketFor } from '@/lib/application-buckets';
 import { CLOSED_SHORTFALL_STATUSES } from '@/lib/constants';
 import { isUuid } from '@/lib/utils';
 import { requireAvailable } from './professional-registrations';
+import { settingString } from './settings';
 
 /**
  * LTP application management.
@@ -410,8 +411,18 @@ export async function createApplication(user: AuthUser, input: CreateApplication
 
   if (!type) throw badRequest('Choose an application type that is currently available.');
 
+  // Read configuration before opening the transaction. The transaction must
+  // use only its own client; opening a second pooled connection here can make
+  // draft creation wait for the pool and surface as a timeout.
+  const numberFormat = await settingString('application_number_format', '{prefix}/{year}/{seq:6}');
+
   const created = await prisma.$transaction(async (tx) => {
-    const { applicationNumber, sequence } = await allocateApplicationNumber(tx, type.numberPrefix);
+    const { applicationNumber, sequence } = await allocateApplicationNumber(
+      tx,
+      type.numberPrefix,
+      new Date(),
+      numberFormat
+    );
 
     const app = await tx.application.create({
       data: {
