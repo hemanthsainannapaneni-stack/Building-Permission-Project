@@ -52,7 +52,10 @@
     "occupancy:verify": "tsx --conditions=react-server --env-file-if-exists=.env scripts/verify-occupancy.ts",
     "developers:config": "tsx --conditions=react-server --env-file-if-exists=.env scripts/seed-developer-config.ts",
     "developers:seed": "tsx --conditions=react-server --env-file-if-exists=.env scripts/seed-developers.ts",
-    "developers:verify": "tsx --conditions=react-server --env-file-if-exists=.env scripts/verify-developer-registration.ts"
+    "developers:verify": "tsx --conditions=react-server --env-file-if-exists=.env scripts/verify-developer-registration.ts",
+    "professionals:config": "tsx --conditions=react-server --env-file-if-exists=.env scripts/seed-professional-config.ts",
+    "professionals:seed": "tsx --conditions=react-server --env-file-if-exists=.env scripts/seed-professionals.ts",
+    "professionals:verify": "tsx --conditions=react-server --env-file-if-exists=.env scripts/verify-professional-registration.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

@@ -12,6 +12,7 @@ import { seedNotifications } from './10-notifications';
 import { seedSuperAdmin } from './11-superadmin';
 import { seedChecklists } from './12-checklists';
 import { seedNocTypes } from './13-noc-types';
+import { seedProfessionalTypes } from './14-professional-types';
 
 /**
  * Seed orchestrator.
@@ -113,6 +114,9 @@ async function main() {
     `  NOC types   ${nocTypes.total} (${nocTypes.active} active · ${nocTypes.created} new, ` +
       `${nocTypes.preserved} kept as configured)`
   );
+
+  const professionalTypes = await seedProfessionalTypes(prisma);
+  console.log(`  Prof. types ${professionalTypes.total} (${professionalTypes.created} new, ${professionalTypes.preserved} kept as configured)`);
 
   const notifications = await seedNotifications(prisma);
   console.log(

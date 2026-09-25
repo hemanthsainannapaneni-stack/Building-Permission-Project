@@ -193,6 +193,31 @@ export const CAPABILITIES = {
   OCCUPANCY_REVIEW: 'OCCUPANCY_REVIEW',
   OCCUPANCY_DECIDE: 'OCCUPANCY_DECIDE',
 
+  // Developer registration (Phase 11)
+  //
+  // A register of its own, belonging to no file. Split by act like the
+  // occupancy grants: one desk REGISTERS (keys in the developer's application
+  // received at the office, submits it, records the answer to a shortfall and
+  // opens a renewal), one VERIFIES (takes it up, raises a shortfall, verifies
+  // the documents), one DECIDES (approves or rejects). Everyone on the desks
+  // reads it. See src/lib/developer-registration.ts.
+  DEVELOPER_VIEW: 'DEVELOPER_VIEW',
+  DEVELOPER_REGISTER: 'DEVELOPER_REGISTER',
+  DEVELOPER_VERIFY: 'DEVELOPER_VERIFY',
+  DEVELOPER_DECIDE: 'DEVELOPER_DECIDE',
+
+  // Professional registration (Phase 12)
+  //
+  // The register of architects, engineers, structural engineers, LTPs and any
+  // other configured type. Split by act exactly as the developer register is:
+  // one desk registers, one verifies (including each document), one decides.
+  // Applications NAME an approved professional; that needs no grant beyond
+  // editing the application. See src/lib/professional-registration.ts.
+  PROFESSIONAL_REG_VIEW: 'PROFESSIONAL_REG_VIEW',
+  PROFESSIONAL_REG_REGISTER: 'PROFESSIONAL_REG_REGISTER',
+  PROFESSIONAL_REG_VERIFY: 'PROFESSIONAL_REG_VERIFY',
+  PROFESSIONAL_REG_DECIDE: 'PROFESSIONAL_REG_DECIDE',
+
   // Shortfalls
   SHORTFALL_CREATE: 'SHORTFALL_CREATE',
   SHORTFALL_VIEW: 'SHORTFALL_VIEW',

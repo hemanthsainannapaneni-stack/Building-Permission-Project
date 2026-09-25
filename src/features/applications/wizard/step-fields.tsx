@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { DataStepKey } from '@/lib/schemas/applications';
 import { WIZARD_REQUIRES_FIELDS_TO_ADVANCE } from '@/lib/application-steps';
 import type { ApplicationMeta } from '../types';
+import { api } from '../api';
 
 /** The required marker, shown only while Next enforces it — see WIZARD_REQUIRES_FIELDS_TO_ADVANCE. */
 const marked = (required?: boolean) => WIZARD_REQUIRES_FIELDS_TO_ADVANCE && Boolean(required);
@@ -516,9 +517,93 @@ function Derived({ label, value }: { label: string; value: string }) {
   );
 }
 
+type RegisteredProfessional = {
+  registrationId: string;
+  registrationNumber: string;
+  typeLabel: string;
+  name: string;
+  licenceNo: string;
+  organization: string;
+  validTo: string | null;
+};
+
+/** Approved, in-force entries of the professional register, for the LTP step's two choices. */
+function useRegistered(purpose: 'FILE_HOLDER' | 'STRUCTURAL', mine: boolean) {
+  const [rows, setRows] = React.useState<RegisteredProfessional[] | null>(null);
+  React.useEffect(() => {
+    let live = true;
+    api
+      .get<RegisteredProfessional[]>(`/api/professionals/available?purpose=${purpose}${mine ? '&mine=true' : ''}`)
+      .then((r) => live && setRows(r))
+      .catch(() => live && setRows([]));
+    return () => {
+      live = false;
+    };
+  }, [purpose, mine]);
+  return rows;
+}
+
+const validLabel = (d: string | null) => (d ? ` · valid to ${new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}` : '');
+
+function RegisterSelect({
+  form,
+  name,
+  label,
+  hint,
+  rows,
+  none,
+}: {
+  form: Form;
+  name: string;
+  label: string;
+  hint: string;
+  rows: RegisteredProfessional[] | null;
+  none: string;
+}) {
+  const error = errorOf(form, name);
+  return (
+    <Field label={label} htmlFor={name} error={error} hint={rows && !rows.length ? `${hint} None is approved and in force at present.` : hint}>
+      <select
+        id={name}
+        disabled={!rows}
+        className="h-9 w-full rounded border border-border-strong bg-surface px-2 text-small text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        {...form.register(name)}
+      >
+        <option value="">{rows ? none : 'Loading the professional register…'}</option>
+        {rows?.map((r) => (
+          <option key={r.registrationId} value={r.registrationId}>
+            {r.registrationNumber} — {r.name} ({r.typeLabel}
+            {r.organization ? `, ${r.organization}` : ''}){validLabel(r.validTo)}
+          </option>
+        ))}
+      </select>
+    </Field>
+  );
+}
+
 function LtpFields({ form }: { form: Form }) {
+  const own = useRegistered('FILE_HOLDER', true);
+  const structural = useRegistered('STRUCTURAL', false);
   return (
     <div className="space-y-4">
+      <div className="grid gap-4 md:grid-cols-2">
+        <RegisterSelect
+          form={form}
+          name="professionalRegistrationId"
+          label="Filing under registration"
+          hint="Your approved entry in the authority’s professional register."
+          rows={own}
+          none="— Not named —"
+        />
+        <RegisterSelect
+          form={form}
+          name="structuralEngineerRegistrationId"
+          label="Structural engineer"
+          hint="From the professional register — approved and in force. Leave blank where no structural certificate is called for."
+          rows={structural}
+          none="— None on this file —"
+        />
+      </div>
       <Area
         form={form}
         name="remarks"

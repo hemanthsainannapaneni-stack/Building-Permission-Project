@@ -195,9 +195,10 @@ model User {
   preferences           NotificationPreference[]
   inspectionsAssigned   SiteInspection[]         @relation("SiteInspectionInspector")
 
-  professionalChangesFrom ProfessionalChangeRequest[] @relation("ProfessionalChangeCurrent")
-  professionalChangesTo   ProfessionalChangeRequest[] @relation("ProfessionalChangeProposed")
-  engagements             ApplicationProfessional[]
+  professionalRegistrations ProfessionalRegistration[]  @relation("ProfessionalRegistrationUser")
+  professionalChangesFrom   ProfessionalChangeRequest[] @relation("ProfessionalChangeCurrent")
+  professionalChangesTo     ProfessionalChangeRequest[] @relation("ProfessionalChangeProposed")
+  engagements               ApplicationProfessional[]
 
   @@index([status, deletedAt])
   @@index([officeId])
@@ -587,11 +588,14 @@ model Applicant {
   // at which a structural design certificate is called for, no structural
   // engineer on record either. An empty string here means "none on this
   // file", which is a real answer and the common one.
-  developerName           String @default("")
-  developerPhone          String @default("")
+  developerName           String  @default("")
+  developerPhone          String  @default("")
   /// The developer's registration with the sanctioning authority, where they
   /// hold one. Stored as printed on the application.
-  developerRegistrationNo String @default("")
+  developerRegistrationNo String  @default("")
+  /// The developer register entry chosen on the LTP step (Phase 11). The three
+  /// developer fields above are its particulars as printed on the file.
+  developerRegistrationId String?
 
   structuralEngineerName  String @default("")
   structuralEngineerPhone String @default("")
@@ -603,6 +607,13 @@ model Applicant {
   /// the council or authority register entry, as distinct from the individual
   /// licence numbers above. Recorded verbatim.
   professionalRegistrationRef String @default("")
+
+  /// The professional register entries chosen on the LTP step (Phase 12). The
+  /// text fields above are the particulars as printed on the file; these name
+  /// the one register record they were taken from, so a professional is never
+  /// recorded twice. Null on files filed before the register, or with none.
+  ltpRegistrationId                String?
+  structuralEngineerRegistrationId String?
 
   /// Why the applicant wants the building, in their own words — "own
   /// residence", "rental", "for the firm's office". BBAS collects it and it
@@ -3545,4 +3556,285 @@ model OccupancyEvent {
 
   @@index([occupancyId, occurredAt])
   @@map("occupancy_events")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Developer registration (Phase 11). See src/lib/developer-registration.ts.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// One application to register a developer with the authority — a first
+/// registration or a renewal. It belongs to no building permission file.
+///
+/// DRAFT → SUBMITTED → IN_PROCESS ⇄ SHORTFALL → VERIFIED → APPROVED | REJECTED,
+/// and an APPROVED registration becomes EXPIRED when its validity lapses.
+///
+/// A renewal is a NEW row (`kind` RENEWAL, `renewalOfId` → the registration it
+/// renews) carrying the same `registrationNumber` and `lineageId`. Rows are
+/// never re-used: an approved registration is a signed record, and renewing it
+/// must not rewrite the validity it was issued with. `isCurrent` marks the one
+/// row per developer the register shows.
+model DeveloperRegistration {
+  id                 String  @id @default(uuid())
+  /// DRA/2026/000001 — the application's own reference, allocated with the draft.
+  applicationNumber  String  @unique
+  /// NEW | RENEWAL
+  kind               String  @default("NEW")
+  /// DEV/2026/000001 — allocated when a NEW registration is approved; a renewal carries its predecessor's.
+  registrationNumber String?
+  /// The id of the first registration in this developer's chain. Every renewal shares it.
+  lineageId          String
+  renewalOfId        String?
+  isCurrent          Boolean @default(true)
+  /// DRAFT | SUBMITTED | IN_PROCESS | SHORTFALL | VERIFIED | APPROVED | REJECTED | EXPIRED
+  status             String  @default("DRAFT")
+  /// 1, then +1 each time a shortfall is answered.
+  round              Int     @default(1)
+
+  // ── The developer ────────────────────────────────────────────────────
+  developerType         String
+  developerName         String
+  organization          String    @default("")
+  authorizedPerson      String
+  authorizedDesignation String    @default("")
+  address               String
+  district              String    @default("")
+  pincode               String    @default("")
+  mobile                String
+  email                 String
+  pan                   String    @default("")
+  gstin                 String    @default("")
+  // ── Registration information ─────────────────────────────────────────
+  /// CIN / LLPIN / firm or society registration number, as the type calls for.
+  incorporationNo       String    @default("")
+  incorporationDate     DateTime?
+  reraNo                String    @default("")
+  experienceYears       Int?
+  projectsCompleted     Int?
+  registrationInfo      String    @default("")
+
+  /// [{ kind, fileObjectId|null, fileName, mimeType, sizeBytes, isDemo, addedAt, addedByName, round, carriedForward }]
+  documents Json @default(dbgenerated("'[]'"))
+
+  // ── Submission ───────────────────────────────────────────────────────
+  submittedById   String?
+  submittedByName String    @default("")
+  submittedAt     DateTime?
+
+  // ── Scrutiny: taken up, shortfall, verification ──────────────────────
+  takenUpById           String?
+  takenUpByName         String    @default("")
+  takenUpAt             DateTime?
+  shortfallItems        Json      @default(dbgenerated("'[]'"))
+  shortfallRemarks      String    @default("")
+  shortfallRaisedByName String    @default("")
+  shortfallRaisedAt     DateTime?
+  shortfallResponse     String    @default("")
+  shortfallRespondedAt  DateTime?
+  /// RECOMMEND_APPROVAL | RECOMMEND_REJECTION
+  verificationOutcome   String    @default("")
+  verificationRemarks   String    @default("")
+  verifiedById          String?
+  verifiedByName        String    @default("")
+  verifiedByRoleKey     String    @default("")
+  verifiedAt            DateTime?
+
+  // ── Decision ─────────────────────────────────────────────────────────
+  /// APPROVED | REJECTED
+  decision         String    @default("")
+  decisionRemarks  String    @default("")
+  decidedById      String?
+  decidedByName    String    @default("")
+  decidedByRoleKey String    @default("")
+  decidedAt        DateTime?
+
+  // ── Validity (set at approval, from the demo settings in force then) ──
+  issueDate         DateTime?
+  validFrom         DateTime?
+  validTo           DateTime?
+  renewalDueDate    DateTime?
+  validityYears     Int?
+  expiredAt         DateTime?
+  /// When a later renewal replaced this registration as the current one.
+  supersededAt      DateTime?
+  /// When the "renewal due" notice went out — once per registration.
+  renewalNotifiedAt DateTime?
+
+  outwardEntryId String?
+  outwardNumber  String  @default("")
+
+  /// The role whose step is next. Empty once closed.
+  currentDeskRoleKey String @default("")
+
+  createdById   String?
+  createdByName String   @default("")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  events DeveloperRegistrationEvent[]
+
+  @@index([isCurrent, status])
+  @@index([status])
+  @@index([lineageId])
+  @@index([registrationNumber])
+  @@index([pan])
+  @@index([validTo])
+  @@map("developer_registrations")
+}
+
+/// Append-only by convention; the audit chain carries the same facts.
+model DeveloperRegistrationEvent {
+  id             String   @id @default(uuid())
+  registrationId String
+  action         String
+  fromStatus     String   @default("")
+  toStatus       String
+  actorId        String?
+  actorName      String   @default("")
+  actorRoleKey   String   @default("")
+  remarks        String   @default("")
+  occurredAt     DateTime @default(now())
+
+  registration DeveloperRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  @@index([registrationId, occurredAt])
+  @@map("developer_registration_events")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Professional registration (Phase 12). See src/lib/professional-registration.ts.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// One application to register a professional — architect, engineer,
+/// structural engineer, LTP or any type configured in master data
+/// (PROFESSIONAL_TYPE) — or to renew that registration. Belongs to no file.
+///
+/// DRAFT → SUBMITTED → IN_PROCESS ⇄ SHORTFALL → VERIFIED → APPROVED | REJECTED,
+/// and APPROVED → EXPIRED when the validity lapses. A renewal is a new row in
+/// the same lineage, as for developers. `userId` links the portal account the
+/// professional signs in with, when they have one — the register never holds a
+/// second copy of a person the users table already holds.
+model ProfessionalRegistration {
+  id                 String  @id @default(uuid())
+  /// PRA/2026/000001 — the application's own reference.
+  applicationNumber  String  @unique
+  /// NEW | RENEWAL
+  kind               String  @default("NEW")
+  /// ARC/2026/000001 etc. — prefix from the professional type; kept across renewals.
+  registrationNumber String?
+  lineageId          String
+  renewalOfId        String?
+  isCurrent          Boolean @default(true)
+  /// DRAFT | SUBMITTED | IN_PROCESS | SHORTFALL | VERIFIED | APPROVED | REJECTED | EXPIRED
+  status             String  @default("DRAFT")
+  round              Int     @default(1)
+
+  /// master_data PROFESSIONAL_TYPE code.
+  professionalType String
+  /// The portal account this professional signs in with, if any.
+  userId           String?
+
+  name             String
+  licenceNo        String
+  /// Council of Architecture, the state engineering council, the authority itself…
+  registrationBody String
+  qualification    String    @default("")
+  experienceYears  Int?
+  organization     String    @default("")
+  address          String
+  district         String    @default("")
+  pincode          String    @default("")
+  mobile           String
+  email            String
+  /// The licence's own validity, as the registration body issued it.
+  licenceValidFrom DateTime?
+  licenceValidTo   DateTime?
+
+  consentGiven Boolean   @default(false)
+  consentText  String    @default("")
+  consentAt    DateTime?
+
+  /// [{ kind, fileObjectId|null, fileName, mimeType, sizeBytes, isDemo, addedAt, addedByName, round,
+  ///    carriedForward?, status: UPLOADED|VERIFIED|REJECTED, verifyRemarks, verifiedByName, verifiedAt }]
+  documents Json @default(dbgenerated("'[]'"))
+
+  submittedById   String?
+  submittedByName String    @default("")
+  submittedAt     DateTime?
+
+  takenUpById   String?
+  takenUpByName String    @default("")
+  takenUpAt     DateTime?
+
+  shortfallItems        Json      @default(dbgenerated("'[]'"))
+  shortfallRemarks      String    @default("")
+  shortfallRaisedByName String    @default("")
+  shortfallRaisedAt     DateTime?
+  shortfallResponse     String    @default("")
+  shortfallRespondedAt  DateTime?
+
+  /// RECOMMEND_APPROVAL | RECOMMEND_REJECTION
+  verificationOutcome String    @default("")
+  verificationRemarks String    @default("")
+  verifiedById        String?
+  verifiedByName      String    @default("")
+  verifiedByRoleKey   String    @default("")
+  verifiedAt          DateTime?
+
+  /// APPROVED | REJECTED
+  decision         String    @default("")
+  decisionRemarks  String    @default("")
+  decidedById      String?
+  decidedByName    String    @default("")
+  decidedByRoleKey String    @default("")
+  decidedAt        DateTime?
+
+  issueDate       DateTime?
+  validFrom       DateTime?
+  validTo         DateTime?
+  renewalDueDate  DateTime?
+  validityYears   Int?
+  /// The registration was cut short to end with the licence.
+  cappedByLicence Boolean   @default(false)
+  expiredAt       DateTime?
+  supersededAt    DateTime?
+
+  outwardEntryId String?
+  outwardNumber  String  @default("")
+
+  currentDeskRoleKey String @default("")
+
+  createdById   String?
+  createdByName String   @default("")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user   User?                           @relation("ProfessionalRegistrationUser", fields: [userId], references: [id])
+  events ProfessionalRegistrationEvent[]
+
+  @@index([isCurrent, status])
+  @@index([status])
+  @@index([lineageId])
+  @@index([professionalType, licenceNo])
+  @@index([userId])
+  @@index([validTo])
+  @@map("professional_registrations")
+}
+
+/// Append-only by convention; the audit chain carries the same facts.
+model ProfessionalRegistrationEvent {
+  id             String   @id @default(uuid())
+  registrationId String
+  action         String
+  fromStatus     String   @default("")
+  toStatus       String
+  actorId        String?
+  actorName      String   @default("")
+  actorRoleKey   String   @default("")
+  remarks        String   @default("")
+  occurredAt     DateTime @default(now())
+
+  registration ProfessionalRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  @@index([registrationId, occurredAt])
+  @@map("professional_registration_events")
 }

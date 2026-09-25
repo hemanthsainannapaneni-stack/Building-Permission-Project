@@ -31,6 +31,7 @@ import {
 import { BUCKETS, bucketFor } from '@/lib/application-buckets';
 import { CLOSED_SHORTFALL_STATUSES } from '@/lib/constants';
 import { isUuid } from '@/lib/utils';
+import { requireAvailable } from './professional-registrations';
 
 /**
  * LTP application management.
@@ -358,6 +359,8 @@ const STEP_MAPPERS: Record<DataStepKey, StepMapper> = {
     read: (app) => ({
       declarationAccepted: Boolean(app.ltpDeclaredAt),
       remarks: (app.ltpDeclaration as { remarks?: string } | null)?.remarks ?? '',
+      professionalRegistrationId: app.applicant?.ltpRegistrationId ?? '',
+      structuralEngineerRegistrationId: app.applicant?.structuralEngineerRegistrationId ?? '',
     }),
     // Written by saveStep directly — the licence particulars are read from the
     // filing LTP's own record on the server and never accepted from the
@@ -539,7 +542,7 @@ export async function saveStep(user: AuthUser, id: string, input: SaveStepInput,
 
   await prisma.$transaction(async (tx) => {
     if (stepKey === 'ltp') {
-      await applyLtpStep(tx, app, parsed as { declarationAccepted: true; remarks: string });
+      await applyLtpStep(tx, app, parsed as LtpStepWrite);
     } else {
       await applyStepWrite(tx, app, STEP_MAPPERS[stepKey].write(parsed as never, app));
     }
@@ -640,11 +643,9 @@ async function applyStepWrite(tx: Tx, app: DetailApplication, write: StepWrite) 
  * The result is frozen into `ltpDeclaration`: a licence may lapse or change
  * class after filing, and the record must show what was true at the time.
  */
-async function applyLtpStep(
-  tx: Tx,
-  app: DetailApplication,
-  data: { declarationAccepted: true; remarks: string }
-) {
+type LtpStepWrite = { declarationAccepted: true; remarks: string; professionalRegistrationId: string; structuralEngineerRegistrationId: string };
+
+async function applyLtpStep(tx: Tx, app: DetailApplication, data: LtpStepWrite) {
   const ltp = await tx.user.findUnique({
     where: { id: app.ltpUserId },
     select: {
@@ -668,6 +669,39 @@ async function applyLtpStep(
     );
   }
 
+  // The professional register (Phase 12). Each named entry must be approved
+  // and in force today; the file records WHICH entry (by id) and prints its
+  // particulars into the fields the application has always carried.
+  const own = data.professionalRegistrationId
+    ? await requireAvailable(tx, data.professionalRegistrationId, 'FILE_HOLDER', { userId: app.ltpUserId })
+    : null;
+  const structural = data.structuralEngineerRegistrationId
+    ? await requireAvailable(tx, data.structuralEngineerRegistrationId, 'STRUCTURAL')
+    : null;
+  await tx.applicant.upsert({
+    where: { applicationId: app.id },
+    create: {
+      applicationId: app.id,
+      ltpRegistrationId: own?.id ?? null,
+      professionalRegistrationRef: own?.registrationNumber ?? '',
+      structuralEngineerRegistrationId: structural?.id ?? null,
+      structuralEngineerName: structural?.name ?? '',
+      structuralEngineerPhone: structural?.mobile ?? '',
+      structuralEngineerRegNo: structural?.registrationNumber ?? '',
+    },
+    update: {
+      ltpRegistrationId: own?.id ?? null,
+      ...(own ? { professionalRegistrationRef: own.registrationNumber ?? '' } : {}),
+      structuralEngineerRegistrationId: structural?.id ?? null,
+      ...(structural
+        ? { structuralEngineerName: structural.name, structuralEngineerPhone: structural.mobile, structuralEngineerRegNo: structural.registrationNumber ?? '' }
+        : app.applicant?.structuralEngineerRegistrationId
+          ? { structuralEngineerName: '', structuralEngineerPhone: '', structuralEngineerRegNo: '' }
+          : {}),
+      ...(!own && app.applicant?.ltpRegistrationId ? { professionalRegistrationRef: '' } : {}),
+    },
+  });
+
   await tx.application.update({
     where: { id: app.id },
     data: {
@@ -682,6 +716,8 @@ async function applyLtpStep(
         licenceClass: ltp.ltpLicenceClass,
         validUpto: ltp.ltpValidUpto?.toISOString() ?? null,
         remarks: data.remarks,
+        professionalRegistration: own ? { id: own.id, number: own.registrationNumber, type: own.professionalType, validTo: own.validTo?.toISOString() ?? null } : null,
+        structuralEngineer: structural ? { id: structural.id, number: structural.registrationNumber, name: structural.name } : null,
       } as never,
     },
   });

@@ -35,8 +35,10 @@ import { badRequest, tooLarge } from '@/server/http/errors';
  */
 
 export type StoreUploadInput = {
+  /** The owning record's id — an application's, or a developer registration's (see `root`). */
   applicationId: string;
-  kind: 'drawings' | 'bim' | 'documents' | 'reports' | 'inspections' | 'nocs' | 'proceedings' | 'commencements' | 'occupancy';
+  kind: 'drawings' | 'bim' | 'documents' | 'reports' | 'inspections' | 'nocs' | 'proceedings' | 'commencements' | 'occupancy' | 'developers' | 'professionals';
+  root?: 'applications' | 'developer-registrations' | 'professional-registrations';
   file: {
     name: string;
     type: string;
@@ -99,6 +101,7 @@ export async function storeUpload(input: StoreUploadInput): Promise<StoredFile> 
   const storageKey = buildStorageKey({
     applicationId: input.applicationId,
     kind: input.kind,
+    root: input.root,
     random: randomBytes(24).toString('hex'),
     extension,
   });

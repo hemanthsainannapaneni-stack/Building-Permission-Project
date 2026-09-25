@@ -179,6 +179,16 @@ export const SETTING_GROUPS: Array<{ key: string; title: string; description: st
     description: 'Which channels are used and how templates are resolved.',
   },
   {
+    key: 'developers',
+    title: 'Developer registration',
+    description: 'Validity and renewal window for developer registrations. Demonstration values; no published rule sets them.',
+  },
+  {
+    key: 'professionals',
+    title: 'Professional registration',
+    description: 'Validity and renewal window for professional registrations. Demonstration values; a registration never outlives the licence itself.',
+  },
+  {
     key: 'security',
     title: 'Security',
     description: 'Session and sign-in behaviour that is policy rather than infrastructure.',

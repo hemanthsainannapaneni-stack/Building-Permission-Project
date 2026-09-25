@@ -284,6 +284,14 @@ export const ltpStepSchema = z.object({
     errorMap: () => ({ message: 'You must accept the declaration before filing' }),
   }),
   remarks: optionalText(1000),
+  /**
+   * The professional register entries named on the file (Phase 12): the
+   * filing LTP's own approved registration, and the structural engineer.
+   * Ids only — the particulars are read from the register on the server, and
+   * each must be approved and in force when the step is saved.
+   */
+  professionalRegistrationId: z.string().uuid().or(z.literal('')).optional().default(''),
+  structuralEngineerRegistrationId: z.string().uuid().or(z.literal('')).optional().default(''),
 });
 export type LtpStepInput = z.infer<typeof ltpStepSchema>;
 

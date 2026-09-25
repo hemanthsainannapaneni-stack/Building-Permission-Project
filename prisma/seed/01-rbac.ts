@@ -29,6 +29,8 @@ const MODULE_OF: Record<string, string> = {
   PROFESSIONAL: 'professional-change',
   COMMENCEMENT: 'post-approval',
   OCCUPANCY: 'post-approval',
+  DEVELOPER: 'developers',
+  PROFESSIONAL_REG: 'professionals',
   ORDER: 'approvals',
   USER: 'administration',
   ROLE: 'administration',
@@ -43,6 +45,9 @@ const MODULE_OF: Record<string, string> = {
 };
 
 function moduleFor(key: string): string {
+  // Two-word prefixes first: PROFESSIONAL_REG_* is not PROFESSIONAL_CHANGE_*.
+  const two = key.split('_').slice(0, 2).join('_');
+  if (MODULE_OF[two]) return MODULE_OF[two];
   const prefix = key.split('_')[0] ?? '';
   return MODULE_OF[prefix] ?? 'general';
 }

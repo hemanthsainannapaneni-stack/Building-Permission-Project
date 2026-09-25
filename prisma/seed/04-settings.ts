@@ -305,6 +305,44 @@ export const SETTINGS: Seed[] = [
     description: 'SMS defers to the next window. Email and in-app are unaffected.',
   },
 
+  // ── Developer registration (DEMO values — no published rule) ─────────
+  {
+    key: 'developer_registration_validity_years',
+    value: '3',
+    type: 'NUMBER',
+    group: 'developers',
+    label: 'Registration validity (years)',
+    description:
+      'DEMO VALUE. How long an approved developer registration runs. Applies to registrations approved after a change; issued ones keep their dates.',
+  },
+  {
+    key: 'developer_renewal_window_days',
+    value: '90',
+    type: 'NUMBER',
+    group: 'developers',
+    label: 'Renewal window (days before expiry)',
+    description: 'DEMO VALUE. Renewal opens, and the registration is listed as due, this many days before it expires.',
+  },
+
+  // ── Professional registration (DEMO values — no statutory period) ─────
+  {
+    key: 'professional_registration_validity_years',
+    value: '3',
+    type: 'NUMBER',
+    group: 'professionals',
+    label: 'Registration validity (years)',
+    description:
+      'DEMO VALUE. How long an approved professional registration runs — never past the licence’s own validity. Issued registrations keep their dates.',
+  },
+  {
+    key: 'professional_renewal_window_days',
+    value: '60',
+    type: 'NUMBER',
+    group: 'professionals',
+    label: 'Renewal window (days before expiry)',
+    description: 'DEMO VALUE. Renewal opens, and the registration is listed as due, this many days before it expires.',
+  },
+
   // ── Security ──────────────────────────────────────────────────────────
   {
     key: 'password_min_length',

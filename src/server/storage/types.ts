@@ -59,10 +59,12 @@ export interface StorageProvider {
  */
 export function buildStorageKey(parts: {
   applicationId: string;
-  kind: 'drawings' | 'bim' | 'documents' | 'reports' | 'orders' | 'receipts' | 'inspections' | 'nocs' | 'proceedings' | 'commencements' | 'occupancy';
+  kind: 'drawings' | 'bim' | 'documents' | 'reports' | 'orders' | 'receipts' | 'inspections' | 'nocs' | 'proceedings' | 'commencements' | 'occupancy' | 'developers' | 'professionals';
   random: string;
   extension: string;
+  /** What `applicationId` names. A developer registration belongs to no application. */
+  root?: 'applications' | 'developer-registrations' | 'professional-registrations';
 }): string {
   const ext = parts.extension.replace(/[^a-z0-9]/gi, '').toLowerCase();
-  return `applications/${parts.applicationId}/${parts.kind}/${parts.random}${ext ? `.${ext}` : ''}`;
+  return `${parts.root ?? 'applications'}/${parts.applicationId}/${parts.kind}/${parts.random}${ext ? `.${ext}` : ''}`;
 }

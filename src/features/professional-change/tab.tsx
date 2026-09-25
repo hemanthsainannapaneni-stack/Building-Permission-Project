@@ -206,10 +206,10 @@ function RequestDialog({
             </Field>
             <Field label="Proposed professional" htmlFor="pc-proposed" required error={errors.proposedProfessionalId}>
               <select id="pc-proposed" className={`${selectClass} w-full`} value={proposed} onChange={(e) => setProposed(e.target.value)}>
-                <option value="">Choose a registered professional…</option>
+                <option value="">{data.professionals.length ? 'Choose from the professional register…' : 'No professional in the register is approved and in force'}</option>
                 {data.professionals.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name} — {p.licenceNo}
+                    {p.name} — {p.registrationNumber} · {p.typeLabel} · licence {p.licenceNo}
                     {p.firmName ? ` (${p.firmName})` : ''}
                   </option>
                 ))}

@@ -73,6 +73,13 @@ const OFFICER_BASE: Capability[] = [
   // Every desk reads the occupancy register. Each step is granted to one desk
   // below: TPA inspects, ZDD reviews, ZJD decides and issues.
   C.OCCUPANCY_VIEW,
+  // Every desk reads the developer register. TPA registers, Planning Officer
+  // verifies, ZJD decides — granted below, the same chain as the change of
+  // professional. Grants, not code: moving a step is a matrix edit.
+  C.DEVELOPER_VIEW,
+  // The professional register, on the same chain: TPA registers, Planning
+  // Officer verifies, ZJD decides — granted below.
+  C.PROFESSIONAL_REG_VIEW,
   C.ORDER_VIEW,
   C.AUDIT_VIEW,
   C.REPORT_VIEW,
@@ -100,6 +107,8 @@ const READ_ONLY: Capability[] = [
   C.PROFESSIONAL_CHANGE_VIEW,
   C.COMMENCEMENT_VIEW,
   C.OCCUPANCY_VIEW,
+  C.DEVELOPER_VIEW,
+  C.PROFESSIONAL_REG_VIEW,
   C.ORDER_VIEW,
   C.AUDIT_VIEW,
   C.REPORT_VIEW,
@@ -178,6 +187,12 @@ export const RBAC_MATRIX: Record<RoleKey, Capability[]> = {
     // Books and records the final inspection, as it does the pre-approval
     // site inspection.
     C.OCCUPANCY_INSPECT,
+    // Keys in a developer's registration application received at the office,
+    // submits it, records the answer to a shortfall and opens a renewal — the
+    // inward desk, as for the owner's change of professional letter.
+    C.DEVELOPER_REGISTER,
+    // Keys in a professional's registration application, as for developers.
+    C.PROFESSIONAL_REG_REGISTER,
   ],
 
   // ── Zonal Assistant / Deputy Director ─────────────────────────────────
@@ -191,7 +206,9 @@ export const RBAC_MATRIX: Record<RoleKey, Capability[]> = {
   //
   // Verifies the documents on a change of professional request — the same
   // technical checking this desk does on the file itself.
-  [ROLES.PLANNING_OFFICER]: [...OFFICER_BASE, C.ANALYTICS_VIEW, C.PROFESSIONAL_CHANGE_VERIFY],
+  //
+  // Verifies a developer's registration documents on the same footing.
+  [ROLES.PLANNING_OFFICER]: [...OFFICER_BASE, C.ANALYTICS_VIEW, C.PROFESSIONAL_CHANGE_VERIFY, C.DEVELOPER_VERIFY, C.PROFESSIONAL_REG_VERIFY],
 
   // NOC_VERIFY for ZAD as well as ZDD: the legacy chain's ZAD_ZDD_REVIEW desk
   // is shared, and the two are granted identically by design.
@@ -259,6 +276,11 @@ export const RBAC_MATRIX: Record<RoleKey, Capability[]> = {
     // Approves or rejects occupancy and issues the certificate — the desk that
     // granted the permission certifies the building built under it.
     C.OCCUPANCY_DECIDE,
+    // Approves or rejects a developer's registration — the apex desk, as for
+    // every other registration-like decision in this chain.
+    C.DEVELOPER_DECIDE,
+    // Approves or rejects a professional's registration.
+    C.PROFESSIONAL_REG_DECIDE,
   ],
 
   // ── Director (Development Plan): city-wide remit ──────────────────────
@@ -354,6 +376,10 @@ export const RBAC_MATRIX: Record<RoleKey, Capability[]> = {
     C.PROFESSIONAL_CHANGE_VIEW,
     C.COMMENCEMENT_VIEW,
     C.OCCUPANCY_VIEW,
+    // Reads the developer register and configures its validity settings;
+    // never registers, verifies or decides.
+    C.DEVELOPER_VIEW,
+    C.PROFESSIONAL_REG_VIEW,
     C.ORDER_VIEW,
     C.USER_MANAGE,
     C.ROLE_MANAGE,

@@ -1,5 +1,6 @@
 import 'server-only';
 import type { Prisma } from '@prisma/client';
+import { availableProfessionals } from './professional-registrations';
 import { prisma } from '@/server/db/prisma';
 import { applicationScope } from '@/server/auth/scope';
 import { can, type AuthUser } from '@/server/auth/context';
@@ -7,7 +8,7 @@ import { badRequest, conflict, forbidden, notFound } from '@/server/http/errors'
 import { env } from '@/server/config/env';
 import { storage } from '@/server/storage';
 import { isUuid } from '@/lib/utils';
-import { CAPABILITIES, ROLES } from '@/lib/constants';
+import { CAPABILITIES } from '@/lib/constants';
 import { ACTIONS, stageName } from '@/lib/workflow';
 import {
   NEXT_STEP,
@@ -401,29 +402,33 @@ async function engagementsOf(app: ApplicationRow) {
   ];
 }
 
-/** Registered professionals a file could pass to. Not scoped: the licence register is public. */
+/**
+ * Professionals a file could pass to: those the PROFESSIONAL REGISTER holds
+ * approved and in force, of a type that may hold a file, with an active LTP
+ * account (Phase 12). The register is the one record of who may practise; the
+ * account supplies the licence particulars the snapshot freezes.
+ */
 export async function eligibleProfessionals(excludeUserId: string) {
+  const entries = await availableProfessionals({ purpose: 'FILE_HOLDER', excludeUserId });
   const users = await prisma.user.findMany({
-    where: {
-      id: { not: excludeUserId },
-      status: 'ACTIVE',
-      deletedAt: null,
-      ltpLicenceNo: { not: null },
-      roles: { some: { role: { key: ROLES.LTP } } },
-    },
-    orderBy: { name: 'asc' },
+    where: { id: { in: entries.map((e) => e.userId!).filter(Boolean) } },
     select: { id: true, name: true, ltpLicenceNo: true, ltpLicenceClass: true, ltpValidUpto: true, firmName: true },
   });
   const now = new Date();
-  return users
-    .filter((u) => licenceValidOn(u.ltpValidUpto, now))
-    .map((u) => ({
+  const seen = new Set<string>();
+  return entries
+    .filter((e) => e.userId && !seen.has(e.userId) && seen.add(e.userId))
+    .map((e) => ({ e, u: users.find((u) => u.id === e.userId)! }))
+    .filter(({ u }) => u && licenceValidOn(u.ltpValidUpto, now))
+    .map(({ e, u }) => ({
       id: u.id,
       name: u.name,
-      licenceNo: u.ltpLicenceNo ?? '',
+      licenceNo: u.ltpLicenceNo ?? e.licenceNo,
       licenceClass: u.ltpLicenceClass ?? '',
       validUpto: u.ltpValidUpto,
-      firmName: u.firmName ?? '',
+      firmName: u.firmName ?? e.organization,
+      registrationNumber: e.registrationNumber,
+      typeLabel: e.typeLabel,
     }));
 }
 
@@ -565,6 +570,12 @@ export async function requestProfessionalChange(
   if (input.proposedProfessionalId === app.ltpUserId) {
     throw badRequest('The proposed professional already holds this file.', [
       { path: 'proposedProfessionalId', message: 'Choose a different professional.' },
+    ]);
+  }
+  // Refused before any upload: the engine asks again inside its transaction.
+  if (!(await eligibleProfessionals(app.ltpUserId)).some((p) => p.id === input.proposedProfessionalId)) {
+    throw badRequest('The proposed professional is not in the professional register, approved and in force.', [
+      { path: 'proposedProfessionalId', message: 'Choose a professional from the register.' },
     ]);
   }
 

@@ -117,6 +117,17 @@ async function scheduleRecurring() {
     dedupeKey: `auditchain:${daily}`,
   });
 
+  // Validity is counted in days, so a daily sweep is exact. The register also
+  // sweeps before it is read, for deployments with no worker.
+  await enqueue(prisma, {
+    type: JOB_TYPES.EXPIRE_DEVELOPER_REGISTRATIONS,
+    dedupeKey: `developer-expiry:${daily}`,
+  });
+  await enqueue(prisma, {
+    type: JOB_TYPES.EXPIRE_PROFESSIONAL_REGISTRATIONS,
+    dedupeKey: `professional-expiry:${daily}`,
+  });
+
   // Every five minutes rather than fifteen: this sweep is what recovers a
   // payer who closed the browser mid-payment, and the difference between a
   // five-minute and a fifteen-minute wait is the difference between "it caught

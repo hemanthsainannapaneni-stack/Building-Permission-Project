@@ -608,6 +608,16 @@ async function main() {
   const { seedOccupancy } = await import('./occupancy');
   await seedOccupancy(prisma, { apply: true, log: (line) => console.log(`  Occupancy ${line.trim()}`) });
 
+  // Phase 11: developer registration — every status and register, through
+  // the real service. Belongs to no application.
+  const { seedDevelopers } = await import('./developers');
+  await seedDevelopers(prisma, { apply: true, log: (line) => console.log(`  Developer ${line.trim()}`) });
+
+  // Phase 12: professional registration — every LTP account registered, and
+  // fictional professionals in every status, through the real service.
+  const { seedProfessionals } = await import('./professionals');
+  await seedProfessionals(prisma, { apply: true, log: (line) => console.log(`  Prof.     ${line.trim()}`) });
+
   await writeManifest({
     version: MANIFEST_VERSION,
     seededAt: new Date().toISOString(),

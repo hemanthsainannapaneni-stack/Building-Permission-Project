@@ -4,6 +4,7 @@ import { audit } from '@/server/services/audit';
 import { formatNumber, nextSequence } from '@/server/services/numbering';
 import { businessRule, conflict } from '@/server/http/errors';
 import { ROLES } from '@/lib/constants';
+import { fileHoldingRegistrationOf } from '@/server/services/professional-registrations';
 import {
   NEXT_STEP,
   OPEN_PROFESSIONAL_CHANGE_STATUSES,
@@ -88,6 +89,7 @@ export async function snapshotOf(tx: Tx, userId: string): Promise<ProfessionalSn
     },
   });
   if (!u) throw businessRule('That professional could not be found.');
+  const registration = await fileHoldingRegistrationOf(tx, u.id);
   return {
     userId: u.id,
     name: u.name,
@@ -97,6 +99,7 @@ export async function snapshotOf(tx: Tx, userId: string): Promise<ProfessionalSn
     licenceClass: u.ltpLicenceClass ?? '',
     validUpto: u.ltpValidUpto ? u.ltpValidUpto.toISOString() : null,
     firmName: u.firmName ?? '',
+    registrationNumber: registration?.registrationNumber ?? '',
     status: u.deletedAt ? 'DELETED' : u.status,
     isLtp: u.roles.some((r) => r.role.key === ROLES.LTP),
   };
@@ -108,6 +111,8 @@ function assertEligible(p: Awaited<ReturnType<typeof snapshotOf>>, currentId: st
   if (!p.isLtp || !p.licenceNo) throw businessRule(`${p.name} is not a registered technical professional.`);
   if (p.status !== 'ACTIVE') throw businessRule(`${p.name}'s account is not active.`);
   if (!licenceValidOn(p.validUpto, on)) throw businessRule(`${p.name}'s licence (${p.licenceNo}) is not in force.`);
+  // Phase 12: a file passes only to a professional the register has approved and holds in force.
+  if (!p.registrationNumber) throw businessRule(`${p.name} holds no approved professional registration in force.`);
 }
 
 const strip = ({ status: _s, isLtp: _l, ...snap }: Awaited<ReturnType<typeof snapshotOf>>): ProfessionalSnapshot => snap;

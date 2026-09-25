@@ -59,6 +59,7 @@ import {
 } from '@/lib/bim';
 import { api, ApiCallError } from '@/features/applications/api';
 import { BimUploadPanel } from './upload-panel';
+import { BimViewer } from './bim-viewer';
 import { NativeSelect } from './native-select';
 import type { BimModelRow, BimPayload, BimRecord, BimStorey, BimVersionRow } from './types';
 
@@ -154,6 +155,7 @@ export function BimTab({
 
   const ifcModels = data.models.filter((m) => m.kind === 'IFC_MODEL');
   const facts = data.primaryFacts;
+  const activeIfc = ifcModels[0]?.versions.find((version) => version.isActive) ?? null;
 
   return (
     <div className="space-y-4">
@@ -173,6 +175,14 @@ export function BimTab({
           </span>
         </p>
       )}
+
+      <BimViewer
+        applicationNumber={data.application.applicationNumber}
+        model={ifcModels[0] ?? null}
+        activeVersion={activeIfc}
+        facts={facts}
+        readiness={data.readiness}
+      />
 
       {/* ══ Readiness ═══════════════════════════════════════════════════ */}
       <ReadinessCard readiness={data.readiness} reviewStatus={data.bim.reviewStatus} />

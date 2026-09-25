@@ -370,6 +370,24 @@ const OCCUPANCY_STATE: Record<string, Meta> = {
   REJECTED: { label: 'Rejected', tone: 'danger' },
 };
 
+/** Where a developer registration stands. See src/lib/developer-registration.ts. */
+const DEVELOPER_STATUS: Record<string, Meta> = {
+  DRAFT: { label: 'Draft', tone: 'neutral' },
+  SUBMITTED: { label: 'Submitted', tone: 'info' },
+  IN_PROCESS: { label: 'In Process', tone: 'purple' },
+  SHORTFALL: { label: 'Shortfall', tone: 'warning' },
+  VERIFIED: { label: 'Verified', tone: 'info' },
+  APPROVED: { label: 'Approved', tone: 'success' },
+  REJECTED: { label: 'Rejected', tone: 'danger' },
+  EXPIRED: { label: 'Expired', tone: 'danger' },
+};
+
+/** Where a professional registration stands. See src/lib/professional-registration.ts. */
+const PROFESSIONAL_STATUS: Record<string, Meta> = {
+  ...DEVELOPER_STATUS,
+  SUBMITTED: { label: 'Pending', tone: 'info' },
+};
+
 /** Where one outward entry stands. See src/lib/outward.ts. */
 const OUTWARD_STATUS: Record<string, Meta> = {
   DRAFT: { label: 'Draft', tone: 'neutral' },
@@ -412,7 +430,9 @@ export type StatusKind =
   | 'outward'
   | 'professionalChange'
   | 'commencement'
-  | 'occupancy';
+  | 'occupancy'
+  | 'developer'
+  | 'professional';
 
 const REGISTRY: Record<StatusKind, Record<string, Meta>> = {
   application: APPLICATION_STATUS,
@@ -435,6 +455,8 @@ const REGISTRY: Record<StatusKind, Record<string, Meta>> = {
   professionalChange: PROFESSIONAL_CHANGE_STATUS,
   commencement: COMMENCEMENT_STATE,
   occupancy: OCCUPANCY_STATE,
+  developer: DEVELOPER_STATUS,
+  professional: PROFESSIONAL_STATUS,
 };
 
 /** An unknown status renders as itself rather than blank — silence hides bugs. */

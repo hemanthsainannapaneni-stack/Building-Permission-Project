@@ -174,6 +174,8 @@ export type ProfessionalSnapshot = {
   licenceClass: string;
   validUpto: string | null;
   firmName: string;
+  /** The professional register entry in force when frozen (Phase 12). Absent on older snapshots. */
+  registrationNumber?: string;
 };
 
 export const COMPARISON_FIELDS: ReadonlyArray<{ key: keyof ProfessionalSnapshot; label: string }> = [
@@ -181,6 +183,7 @@ export const COMPARISON_FIELDS: ReadonlyArray<{ key: keyof ProfessionalSnapshot;
   { key: 'licenceNo', label: 'Licence number' },
   { key: 'licenceClass', label: 'Licence class' },
   { key: 'validUpto', label: 'Licence valid up to' },
+  { key: 'registrationNumber', label: 'Professional registration' },
   { key: 'firmName', label: 'Firm' },
   { key: 'email', label: 'Email' },
   { key: 'phone', label: 'Phone' },

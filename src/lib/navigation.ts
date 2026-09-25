@@ -11,6 +11,8 @@ import {
   UserRoundCog,
   HardHat,
   Building2,
+  BriefcaseBusiness,
+  IdCard,
   CreditCard,
   FolderOpen,
   SlidersHorizontal,
@@ -109,6 +111,18 @@ export const NAV: NavSection[] = [
         href: '/occupancy',
         icon: Building2,
         capabilities: [C.OCCUPANCY_VIEW],
+      },
+      {
+        label: 'Developers',
+        href: '/developers',
+        icon: BriefcaseBusiness,
+        capabilities: [C.DEVELOPER_VIEW],
+      },
+      {
+        label: 'Professionals',
+        href: '/professionals',
+        icon: IdCard,
+        capabilities: [C.PROFESSIONAL_REG_VIEW],
       },
       {
         label: 'Outward',

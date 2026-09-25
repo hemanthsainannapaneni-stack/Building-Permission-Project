@@ -57,6 +57,8 @@ export type EligibleProfessional = {
   licenceClass: string;
   validUpto: string | null;
   firmName: string;
+  registrationNumber: string;
+  typeLabel: string;
 };
 
 export type ApplicationProfessionalPayload = {

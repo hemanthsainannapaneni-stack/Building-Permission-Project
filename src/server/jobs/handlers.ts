@@ -13,6 +13,8 @@ import { advanceOrder, ensureApprovalOrder } from '@/server/services/approval-or
 import { storeApprovalOrderPdf } from '@/server/services/approval-order-pdf';
 import { ORDER_STATUS } from '@/lib/approval-orders';
 import { sweepSla } from '@/server/workflow/sla';
+import { expireLapsedDeveloperRegistrations } from '@/server/services/developer-registrations';
+import { expireLapsedProfessionalRegistrations } from '@/server/services/professional-registrations';
 import { JOB_TYPES, type ClaimedJob } from './queue';
 
 /**
@@ -276,6 +278,21 @@ register(JOB_TYPES.SWEEP_SLA, async () => {
         `${report.overdue} overdue · ${report.notified} notified`
     );
   }
+});
+
+// ── EXPIRE_DEVELOPER_REGISTRATIONS ───────────────────────────────────────
+//
+// An approved developer registration past its validity becomes EXPIRED, with
+// an event and an audit row each. Idempotent; see the service.
+
+register(JOB_TYPES.EXPIRE_DEVELOPER_REGISTRATIONS, async () => {
+  const report = await expireLapsedDeveloperRegistrations();
+  if (report.expired) console.log(`[developers] expiry sweep: ${report.expired} of ${report.examined} expired`);
+});
+
+register(JOB_TYPES.EXPIRE_PROFESSIONAL_REGISTRATIONS, async () => {
+  const report = await expireLapsedProfessionalRegistrations();
+  if (report.expired) console.log(`[professionals] expiry sweep: ${report.expired} of ${report.examined} expired`);
 });
 
 // ── RENDER_APPROVAL_ORDER ────────────────────────────────────────────────
