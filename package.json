@@ -46,9 +46,13 @@
     "commencement:config": "tsx --conditions=react-server --env-file-if-exists=.env scripts/seed-commencement-config.ts",
     "commencement:seed": "tsx --conditions=react-server --env-file-if-exists=.env scripts/seed-work-commencements.ts",
     "commencement:verify": "tsx --conditions=react-server --env-file-if-exists=.env scripts/verify-commencement.ts",
+    "demo:approved": "tsx --conditions=react-server --env-file-if-exists=.env scripts/seed-post-approval-files.ts",
     "occupancy:config": "tsx --conditions=react-server --env-file-if-exists=.env scripts/seed-occupancy-config.ts",
     "occupancy:seed": "tsx --conditions=react-server --env-file-if-exists=.env scripts/seed-occupancy.ts",
-    "occupancy:verify": "tsx --conditions=react-server --env-file-if-exists=.env scripts/verify-occupancy.ts"
+    "occupancy:verify": "tsx --conditions=react-server --env-file-if-exists=.env scripts/verify-occupancy.ts",
+    "developers:config": "tsx --conditions=react-server --env-file-if-exists=.env scripts/seed-developer-config.ts",
+    "developers:seed": "tsx --conditions=react-server --env-file-if-exists=.env scripts/seed-developers.ts",
+    "developers:verify": "tsx --conditions=react-server --env-file-if-exists=.env scripts/verify-developer-registration.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

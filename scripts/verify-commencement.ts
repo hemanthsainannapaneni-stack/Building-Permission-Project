@@ -58,8 +58,13 @@ async function actorFor(userId: string): Promise<AuthUser> {
   };
 }
 
+/**
+ * A real account holding the role (in the zone). FEWEST roles wins: the demo's
+ * all-roles System Administrator also holds LTP, and a refusal test run as it
+ * would be testing nothing — it would pass, and write.
+ */
 async function userWithRole(roleKey: string, zoneId?: string | null) {
-  const u = await prisma.user.findFirst({
+  const c = await prisma.user.findMany({
     where: {
       status: 'ACTIVE',
       deletedAt: null,
@@ -67,8 +72,9 @@ async function userWithRole(roleKey: string, zoneId?: string | null) {
       ...(zoneId ? { OR: [{ primaryZoneId: zoneId }, { jurisdictions: { some: { zoneId } } }] } : {}),
     },
     orderBy: { createdAt: 'asc' },
-    select: { id: true },
+    select: { id: true, _count: { select: { roles: true } } },
   });
+  const u = c.sort((a, b) => a._count.roles - b._count.roles)[0];
   return u ? actorFor(u.id) : null;
 }
 
@@ -193,8 +199,11 @@ async function main() {
     const events = await prisma.outboxEvent.findMany({ where: { applicationId: app.id, eventCode: 'WORK_INITIATED' }, select: { processed: true } });
     check('WORK_INITIATED emitted once', events.length === 1, `${events.length}`);
     check('…and dispatched', events.every((e) => e.processed));
-    const inbox = await prisma.notification.count({ where: { applicationId: app.id, eventCode: 'WORK_INITIATED', userId: app.ltpUserId } });
-    check('the LTP has the in-app notification', inbox >= 1);
+    // Addressed, not necessarily delivered: the dispatcher sends the same event
+    // to the same person on the same channel once a minute, so a seed that
+    // notifies several of one LTP's files at once records the rest as SKIPPED.
+    const addressed = await prisma.notificationLog.count({ where: { applicationId: app.id, eventCode: 'WORK_INITIATED', recipientUserId: app.ltpUserId } });
+    check('the LTP was addressed (in-app and email)', addressed >= 1, `${addressed} log row(s)`);
   }
 
   // ── No work initiated before the applicable approval ─────────────────
@@ -265,8 +274,9 @@ async function main() {
       );
       check('a TPA cannot notify commencement', Boolean(r), r);
     }
+    // An LTP and nothing else — not an account whose other roles see every file.
     const other = await prisma.user.findFirst({
-      where: { id: { not: pending.ltpUserId }, status: 'ACTIVE', roles: { some: { role: { key: 'LTP' } } } },
+      where: { id: { not: pending.ltpUserId }, status: 'ACTIVE', roles: { some: { role: { key: 'LTP' } }, every: { role: { key: 'LTP' } } } },
       select: { id: true },
     });
     if (other) {
