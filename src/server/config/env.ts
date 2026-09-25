@@ -154,8 +154,8 @@ function parse() {
     isTest: e.NODE_ENV === 'test',
 
     appUrl: e.APP_URL,
-    appName: e.APP_NAME,
-    orgShortName: e.ORG_SHORT_NAME,
+    appName: 'BBAS',
+    orgShortName: 'BBAS',
 
     databaseUrl: e.DATABASE_URL,
     directUrl: e.DIRECT_URL || e.DATABASE_URL,
