@@ -158,6 +158,8 @@ export const propertyStepSchema = z.object({
   village: optionalText(120),
   localityName: optionalText(200),
   wardNo: optionalText(30),
+  lpsStatus: optionalText(30),
+  planningZone: optionalText(60),
 });
 export type PropertyStepInput = z.infer<typeof propertyStepSchema>;
 

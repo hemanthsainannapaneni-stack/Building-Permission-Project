@@ -650,6 +650,10 @@ model PropertyDetail {
   village      String  @default("")
   localityName String  @default("")
   wardNo       String  @default("")
+  /// Whether the plot lies inside or outside the notified land-pooling scheme.
+  lpsStatus    String  @default("")
+  /// Planning/master-plan zone recorded for the plot.
+  planningZone String  @default("")
   streetName   String  @default("")
   doorNo       String  @default("")
   pincode      String  @default("")

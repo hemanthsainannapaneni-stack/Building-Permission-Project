@@ -268,6 +268,21 @@ function SectionNote({ children }: { children: React.ReactNode }) {
 
 const grid = 'grid gap-4 sm:grid-cols-2';
 
+const LPS_OPTIONS = [
+  { code: 'INSIDE_LPS', label: 'Inside LPS' },
+  { code: 'OUTSIDE_LPS', label: 'Outside LPS' },
+];
+
+const PLANNING_ZONE_OPTIONS = [
+  { code: 'R1_ZONE', label: 'R1 Zone' },
+  { code: 'R2_ZONE', label: 'R2 Zone' },
+  { code: 'COMMERCIAL_ZONE', label: 'Commercial Zone' },
+  { code: 'MIXED_USE_ZONE', label: 'Mixed Use Zone' },
+  { code: 'INSTITUTIONAL_ZONE', label: 'Institutional Zone' },
+  { code: 'AGRICULTURAL_ZONE', label: 'Agricultural Zone' },
+  { code: 'OPEN_SPACE_ZONE', label: 'Open Space Zone' },
+];
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Steps
 // ═══════════════════════════════════════════════════════════════════════════
@@ -326,12 +341,25 @@ function OwnerFields({ form, applicantName }: { form: Form; applicantName?: stri
 
 function PropertyFields({ form }: { form: Form }) {
   return (
-    <div className={grid}>
-      <Text form={form} name="district" label="District" required autoFocus />
-      <Text form={form} name="mandal" label="Mandal" />
-      <Text form={form} name="village" label="Village" />
-      <Text form={form} name="localityName" label="Locality" />
-      <Text form={form} name="wardNo" label="Ward number" />
+    <div className="space-y-5">
+      <div className={grid}>
+        <Text form={form} name="district" label="District" required autoFocus />
+        <Text form={form} name="mandal" label="Mandal" />
+        <Text form={form} name="village" label="Village" />
+        <Text form={form} name="localityName" label="Locality" />
+        <Text form={form} name="wardNo" label="Ward number" />
+      </div>
+
+      <fieldset className="space-y-3 rounded border border-border bg-surface-sunk/50 p-4">
+        <legend className="px-1 text-small font-medium text-text">Plot details</legend>
+        <p className="text-caption text-text-muted">
+          Select the land-pooling status and the planning zone recorded for this plot.
+        </p>
+        <div className={grid}>
+          <Choice form={form} name="lpsStatus" label="LPS status" options={LPS_OPTIONS} />
+          <Choice form={form} name="planningZone" label="Planning zone" options={PLANNING_ZONE_OPTIONS} />
+        </div>
+      </fieldset>
     </div>
   );
 }

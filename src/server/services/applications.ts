@@ -249,6 +249,8 @@ const STEP_MAPPERS: Record<DataStepKey, StepMapper> = {
       village: app.property?.village ?? '',
       localityName: app.property?.localityName ?? '',
       wardNo: app.property?.wardNo ?? '',
+      lpsStatus: app.property?.lpsStatus ?? '',
+      planningZone: app.property?.planningZone ?? '',
     }),
     write: (data: Record<string, unknown>) => ({ property: data as never }),
   },
