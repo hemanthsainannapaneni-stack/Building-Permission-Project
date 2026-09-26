@@ -36,7 +36,7 @@ export function ProfileMenu({
       // A hard navigation, not router.push: it discards every cached server
       // component so the next user of this browser cannot see the last one's
       // rendered pages.
-      window.location.href = '/login';
+      window.location.href = '/';
     } catch {
       setSigningOut(false);
       toast.error('Could not sign out', {
