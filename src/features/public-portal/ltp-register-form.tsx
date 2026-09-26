@@ -60,8 +60,8 @@ export function LtpRegisterForm({ professionalTypes }: { professionalTypes: { co
       } else {
         setState({ status: 'error', message: res.message });
       }
-    } catch (err: any) {
-      setState({ status: 'error', message: err?.message || 'Submission failed' });
+    } catch (err: unknown) {
+      setState({ status: 'error', message: err instanceof Error ? err.message : 'Submission failed' });
     }
   }
 
@@ -320,7 +320,7 @@ export function LtpRegisterForm({ professionalTypes }: { professionalTypes: { co
                       <SelectValue placeholder="Select" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="q1">What is your mother's maiden name?</SelectItem>
+                      <SelectItem value="q1">What is your mother&apos;s maiden name?</SelectItem>
                       <SelectItem value="q2">What was the name of your first pet?</SelectItem>
                       <SelectItem value="q3">What city were you born in?</SelectItem>
                     </SelectContent>

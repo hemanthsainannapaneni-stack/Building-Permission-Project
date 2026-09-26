@@ -11,7 +11,7 @@ import {
   WORKSPACE_HREF,
 } from '@/lib/public-portal';
 import { PublicNav } from './nav';
-import { Preferences } from './preferences';
+import { PublicNav } from './nav';
 import { Container } from './primitives';
 
 /**
@@ -31,7 +31,7 @@ import { Container } from './primitives';
  * goes to the dashboard — the only thing about the frame that depends on who
  * is looking, so it is the only thing that does.
  */
-export function PublicShell({ children, appName, isSignedIn }: { children: React.ReactNode; appName: string; isSignedIn: boolean }) {
+export function PublicShell({ children, isSignedIn }: { children: React.ReactNode; isSignedIn: boolean }) {
   const items = [
     { label: HOME_LINK.label, href: HOME_LINK.href },
     { label: DASHBOARD_LINK.label, href: DASHBOARD_LINK.href },
@@ -71,7 +71,7 @@ export function PublicShell({ children, appName, isSignedIn }: { children: React
               <img src="/portal/minister.png" alt="Minister Sri Ponguru Narayana" className="h-20 w-auto object-contain drop-shadow-sm" />
               <div className="hidden md:block">
                 <p className="text-[#8c1c13] font-bold text-sm tracking-wide">Sri Ponguru Narayana</p>
-                <p className="text-xs text-slate-800 font-medium">Hon'ble Minister for MA&UD</p>
+                <p className="text-xs text-slate-800 font-medium">Hon&apos;ble Minister for MA&amp;UD</p>
                 <p className="text-xs text-slate-800 font-medium">Andhra Pradesh Government</p>
               </div>
             </div>
@@ -97,7 +97,7 @@ export function PublicShell({ children, appName, isSignedIn }: { children: React
             <div className="flex items-center gap-4 text-right">
               <div className="hidden md:block">
                 <p className="text-[#8c1c13] font-bold text-sm tracking-wide">Sri Nara Chandrababu Naidu</p>
-                <p className="text-xs text-slate-800 font-medium">Hon'ble Chief Minister</p>
+                <p className="text-xs text-slate-800 font-medium">Hon&apos;ble Chief Minister</p>
                 <p className="text-xs text-slate-800 font-medium">Andhra Pradesh Government</p>
               </div>
               <img src="/portal/cm.png" alt="Chief Minister Sri Nara Chandrababu Naidu" className="h-20 w-auto object-contain drop-shadow-sm" />

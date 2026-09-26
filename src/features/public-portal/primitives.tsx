@@ -1,12 +1,11 @@
 import * as React from 'react';
 import Link from 'next/link';
-import { AlertTriangle, ChevronRight, FlaskConical, Home, Info, SearchX } from 'lucide-react';
+import { AlertTriangle, ChevronRight, Home, Info, SearchX } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { DEMO_NOTICE } from '@/lib/public-portal';
 
 /**
  * The small pieces every public page is built from. None holds state, so all of
@@ -95,7 +94,7 @@ export function PageFrame({
 }
 
 /** The one line every demonstration surface carries. */
-export function DemoBanner({ children }: { children?: React.ReactNode }) {
+export function DemoBanner() {
   return null;
 }
 
