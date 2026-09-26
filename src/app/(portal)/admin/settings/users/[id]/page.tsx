@@ -71,12 +71,27 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
   const user = await loadUser(id);
   if (!user) notFound();
 
-  const [activity, roles] = await Promise.all([
+  const [activity, roles, departments, offices, zones] = await Promise.all([
     getUserActivity(id, 15),
     prisma.role.findMany({
       where: { deletedAt: null },
       select: { key: true, name: true },
       orderBy: { rank: 'asc' },
+    }),
+    prisma.department.findMany({
+      where: { deletedAt: null, isActive: true },
+      select: { id: true, code: true, name: true },
+      orderBy: { name: 'asc' },
+    }),
+    prisma.office.findMany({
+      where: { deletedAt: null, isActive: true },
+      select: { id: true, code: true, name: true, departmentId: true, zoneId: true },
+      orderBy: { name: 'asc' },
+    }),
+    prisma.zone.findMany({
+      where: { deletedAt: null, isActive: true },
+      select: { id: true, code: true, name: true },
+      orderBy: { code: 'asc' },
     }),
   ]);
 
@@ -104,6 +119,16 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
             isLocked={isLocked}
             currentRoleKey={roleKey}
             roles={roles}
+            meta={{
+              departments,
+              offices,
+              zones,
+              departmentId: user.department?.id || null,
+              officeId: user.office?.id || null,
+              primaryZoneId: user.primaryZone?.id || null,
+              zoneIds: user.zones.map((z) => z.id),
+              designation: user.designation || undefined,
+            }}
             isSelf={actor.id === user.id}
           />
         }

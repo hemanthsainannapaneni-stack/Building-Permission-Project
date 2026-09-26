@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { MoreHorizontal, KeyRound, UserX, UserCheck, Unlock, Copy, Check, ShieldAlert } from 'lucide-react';
+import { MoreHorizontal, KeyRound, UserX, UserCheck, Unlock, Copy, Check, ShieldAlert, Building } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,12 +23,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Field } from '@/components/ui/field';
 import { toast } from '@/components/ui/toast';
 
-/**
- * Row actions on the user detail page.
- *
- * Each destructive action confirms with a plain-language statement of what
- * will actually happen — "signs them out of every device", not "are you sure?".
- */
+export type UserActionsMeta = {
+  departments: Array<{ id: string; code: string; name: string }>;
+  offices: Array<{ id: string; code: string; name: string; departmentId: string | null; zoneId: string | null }>;
+  zones: Array<{ id: string; code: string; name: string }>;
+  departmentId: string | null;
+  officeId: string | null;
+  primaryZoneId: string | null;
+  zoneIds: string[];
+  designation?: string;
+};
+
 export function UserActions({
   userId,
   userName,
@@ -36,6 +41,7 @@ export function UserActions({
   isLocked,
   currentRoleKey,
   roles,
+  meta,
   isSelf,
 }: {
   userId: string;
@@ -44,22 +50,28 @@ export function UserActions({
   isLocked: boolean;
   currentRoleKey: string;
   roles: Array<{ key: string; name: string }>;
+  meta?: UserActionsMeta;
   isSelf: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = React.useState(false);
-  const [dialog, setDialog] = React.useState<'deactivate' | 'activate' | 'reset' | 'role' | null>(null);
+  const [dialog, setDialog] = React.useState<'deactivate' | 'activate' | 'reset' | 'role' | 'desk' | null>(null);
   const [temporaryPassword, setTemporaryPassword] = React.useState<string | null>(null);
   const [nextRole, setNextRole] = React.useState(currentRoleKey);
   const [copied, setCopied] = React.useState(false);
+  
+  // Desk states
+  const [nextDepartmentId, setNextDepartmentId] = React.useState(meta?.departmentId || 'none');
+  const [nextOfficeId, setNextOfficeId] = React.useState(meta?.officeId || 'none');
+  const [nextPrimaryZoneId, setNextPrimaryZoneId] = React.useState(meta?.primaryZoneId || 'none');
 
   const active = status === 'ACTIVE';
 
-  async function call(url: string, body?: unknown) {
+  async function call(url: string, body?: unknown, method = 'POST') {
     setBusy(true);
     try {
       const res = await fetch(url, {
-        method: 'POST',
+        method,
         headers: { 'Content-Type': 'application/json' },
         ...(body ? { body: JSON.stringify(body) } : {}),
       });
@@ -101,26 +113,27 @@ export function UserActions({
   }
 
   async function changeRole() {
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/admin/users/${userId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roleKey: nextRole }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        toast.error('Could not change the role', { description: data.error ?? 'Try again shortly.' });
-        return;
-      }
-      setDialog(null);
-      toast.success('Role updated', {
-        description: `${userName} is now ${roles.find((r) => r.key === nextRole)?.name}.`,
-      });
-      router.refresh();
-    } finally {
-      setBusy(false);
-    }
+    const data = await call(`/api/admin/users/${userId}`, { roleKey: nextRole }, 'PATCH');
+    if (!data) return;
+    setDialog(null);
+    toast.success('Role updated', {
+      description: `${userName} is now ${roles.find((r) => r.key === nextRole)?.name}.`,
+    });
+    router.refresh();
+  }
+
+  async function changeDesk() {
+    const data = await call(`/api/admin/users/${userId}`, {
+      departmentId: nextDepartmentId === 'none' ? null : nextDepartmentId,
+      officeId: nextOfficeId === 'none' ? null : nextOfficeId,
+      primaryZoneId: nextPrimaryZoneId === 'none' ? null : nextPrimaryZoneId,
+    }, 'PATCH');
+    if (!data) return;
+    setDialog(null);
+    toast.success('Posting updated', {
+      description: `${userName}'s desk assignment has been changed.`,
+    });
+    router.refresh();
   }
 
   return (
@@ -133,6 +146,13 @@ export function UserActions({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          {meta && (
+            <DropdownMenuItem onSelect={() => setDialog('desk')}>
+              <Building className="size-4" />
+              Assign desk
+            </DropdownMenuItem>
+          )}
+
           <DropdownMenuItem onSelect={() => setDialog('role')} disabled={isSelf}>
             <ShieldAlert className="size-4" />
             Change role
@@ -164,6 +184,67 @@ export function UserActions({
         </DropdownMenuContent>
       </DropdownMenu>
 
+      {/* Desk Assignment */}
+      {meta && (
+        <Dialog open={dialog === 'desk'} onOpenChange={(o) => !o && setDialog(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Assign desk</DialogTitle>
+              <DialogDescription>
+                Assign {userName} to an office or zone. This controls which files they can access.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogBody className="space-y-4">
+              <Field label="Department" htmlFor="nextDepartmentId">
+                <Select value={nextDepartmentId} onValueChange={setNextDepartmentId}>
+                  <SelectTrigger id="nextDepartmentId">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No department</SelectItem>
+                    {meta.departments.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+
+              <Field label="Office" htmlFor="nextOfficeId">
+                <Select value={nextOfficeId} onValueChange={setNextOfficeId}>
+                  <SelectTrigger id="nextOfficeId">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No office</SelectItem>
+                    {meta.offices.map((o) => (
+                      <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+
+              <Field label="Primary Zone" htmlFor="nextPrimaryZoneId">
+                <Select value={nextPrimaryZoneId} onValueChange={setNextPrimaryZoneId}>
+                  <SelectTrigger id="nextPrimaryZoneId">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No primary zone</SelectItem>
+                    {meta.zones.map((z) => (
+                      <SelectItem key={z.id} value={z.id}>{z.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </DialogBody>
+            <DialogFooter>
+              <Button variant="secondary" onClick={() => setDialog(null)}>Cancel</Button>
+              <Button variant="primary" loading={busy} onClick={() => void changeDesk()}>Save posting</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* Deactivate */}
       <Dialog open={dialog === 'deactivate'} onOpenChange={(o) => !o && setDialog(null)}>
         <DialogContent>
@@ -176,12 +257,8 @@ export function UserActions({
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="secondary" onClick={() => setDialog(null)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" loading={busy} onClick={() => void setStatus('INACTIVE')}>
-              Deactivate
-            </Button>
+            <Button variant="secondary" onClick={() => setDialog(null)}>Cancel</Button>
+            <Button variant="destructive" loading={busy} onClick={() => void setStatus('INACTIVE')}>Deactivate</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -196,12 +273,8 @@ export function UserActions({
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="secondary" onClick={() => setDialog(null)}>
-              Cancel
-            </Button>
-            <Button variant="primary" loading={busy} onClick={() => void setStatus('ACTIVE')}>
-              Activate
-            </Button>
+            <Button variant="secondary" onClick={() => setDialog(null)}>Cancel</Button>
+            <Button variant="primary" loading={busy} onClick={() => void setStatus('ACTIVE')}>Activate</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -224,26 +297,15 @@ export function UserActions({
                 </SelectTrigger>
                 <SelectContent>
                   {roles.map((role) => (
-                    <SelectItem key={role.key} value={role.key}>
-                      {role.name}
-                    </SelectItem>
+                    <SelectItem key={role.key} value={role.key}>{role.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </Field>
           </DialogBody>
           <DialogFooter>
-            <Button variant="secondary" onClick={() => setDialog(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              loading={busy}
-              disabled={nextRole === currentRoleKey}
-              onClick={() => void changeRole()}
-            >
-              Change role
-            </Button>
+            <Button variant="secondary" onClick={() => setDialog(null)}>Cancel</Button>
+            <Button variant="primary" loading={busy} disabled={nextRole === currentRoleKey} onClick={() => void changeRole()}>Change role</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -294,16 +356,7 @@ export function UserActions({
                 </div>
               </DialogBody>
               <DialogFooter>
-                <Button
-                  variant="primary"
-                  onClick={() => {
-                    setTemporaryPassword(null);
-                    setDialog(null);
-                    router.refresh();
-                  }}
-                >
-                  Done
-                </Button>
+                <Button variant="primary" onClick={() => { setTemporaryPassword(null); setDialog(null); router.refresh(); }}>Done</Button>
               </DialogFooter>
             </>
           ) : (
@@ -316,12 +369,8 @@ export function UserActions({
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
-                <Button variant="secondary" onClick={() => setDialog(null)}>
-                  Cancel
-                </Button>
-                <Button variant="primary" loading={busy} onClick={() => void resetPassword()}>
-                  Reset password
-                </Button>
+                <Button variant="secondary" onClick={() => setDialog(null)}>Cancel</Button>
+                <Button variant="primary" loading={busy} onClick={() => void resetPassword()}>Reset password</Button>
               </DialogFooter>
             </>
           )}
