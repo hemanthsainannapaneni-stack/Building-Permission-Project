@@ -26,6 +26,16 @@ export type SystemCounts = {
   workflowName: string;
   failedJobs: number;
   unprocessedEvents: number;
+  // Registers
+  applications: number;
+  developers: number;
+  professionals: number;
+  payments: number;
+  documents: number;
+  shortfalls: number;
+  showCause: number;
+  outward: number;
+  occupancy: number;
 };
 
 async function systemCounts(): Promise<SystemCounts> {
@@ -44,6 +54,15 @@ async function systemCounts(): Promise<SystemCounts> {
     workflow,
     failedJobs,
     unprocessedEvents,
+    applications,
+    developers,
+    professionals,
+    payments,
+    documents,
+    shortfalls,
+    showCause,
+    outward,
+    occupancy,
   ] = await Promise.all([
     prisma.user.count({ where: { deletedAt: null } }),
     prisma.user.count({ where: { deletedAt: null, status: 'ACTIVE' } }),
@@ -63,6 +82,15 @@ async function systemCounts(): Promise<SystemCounts> {
     }),
     prisma.job.count({ where: { status: 'DEAD' } }),
     prisma.outboxEvent.count({ where: { processed: false } }),
+    prisma.application.count(),
+    prisma.developerRegistration.count(),
+    prisma.professionalRegistration.count(),
+    prisma.payment.count(),
+    prisma.applicationDocument.count(),
+    prisma.shortfall.count(),
+    prisma.showCauseNotice.count(),
+    prisma.outwardEntry.count(),
+    prisma.occupancyApplication.count(),
   ]);
 
   return {
@@ -82,6 +110,15 @@ async function systemCounts(): Promise<SystemCounts> {
     workflowName: workflow ? `${workflow.name} · v${workflow.version}` : 'None published',
     failedJobs,
     unprocessedEvents,
+    applications,
+    developers,
+    professionals,
+    payments,
+    documents,
+    shortfalls,
+    showCause,
+    outward,
+    occupancy,
   };
 }
 
@@ -119,13 +156,14 @@ export default async function SettingsOverviewPage() {
         />
       </div>
 
-      <div className="mt-6">
-        <Panel title="System health">
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <Panel title="System configuration & health">
           <StatRow
             label="Workflow"
             value={counts.workflowPublished ? 'Published' : 'Not published'}
             tone={counts.workflowPublished ? 'success' : 'danger'}
             hint={counts.workflowName}
+            href="/admin/settings/workflows"
           />
           <StatRow
             label="Failed background jobs"
@@ -138,12 +176,23 @@ export default async function SettingsOverviewPage() {
             tone={counts.unprocessedEvents > 20 ? 'warning' : 'neutral'}
           />
           <StatRow label="Notifications sent" value={counts.notificationsSent} />
-          <StatRow
-            label="Audit events recorded"
-            value={counts.auditEvents}
-          />
           <StatRow label="Document types configured" value={counts.documentTypes} href="/admin/settings/document-types" />
           <StatRow label="Application types" value={counts.applicationTypes} href="/admin/settings/system" />
+          <StatRow label="NOC types configured" value="Active" href="/admin/settings/noc-types" />
+          <StatRow label="Checklists configured" value="Active" href="/admin/settings/checklists" />
+        </Panel>
+
+        <Panel title="Registers & logs">
+          <StatRow label="Applications" value={counts.applications} href="/applications" />
+          <StatRow label="Developers" value={counts.developers} href="/developers" />
+          <StatRow label="Professionals (LTP)" value={counts.professionals} href="/ltp" />
+          <StatRow label="Payments" value={counts.payments} href="/payments" />
+          <StatRow label="Documents" value={counts.documents} href="/documents" />
+          <StatRow label="Shortfalls" value={counts.shortfalls} href="/shortfalls" />
+          <StatRow label="Show Cause Notices" value={counts.showCause} href="/show-cause" />
+          <StatRow label="Outward Register" value={counts.outward} href="/outward" />
+          <StatRow label="Occupancy" value={counts.occupancy} href="/occupancy" />
+          <StatRow label="Audit events" value={counts.auditEvents} />
         </Panel>
       </div>
     </div>
